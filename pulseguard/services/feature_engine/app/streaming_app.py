@@ -55,7 +55,8 @@ app = faust.App(
     "pulseguard-feature-engine",
     broker=f"kafka://{KAFKA_BOOTSTRAP_SERVERS}",
     value_serializer="raw",
-    topic_allow_declare=False,  # topics are created up front by the kafka-init job
+    topic_partitions=3,  # matches the kafka-init job's topic layout
+    web_enabled=False,  # main.py serves HTTP; Faust's own web server would be dead weight
 )
 
 raw_topic = app.topic("pulseguard.events.raw")

@@ -19,5 +19,4 @@ river>=0.21
 faust-streaming>=0.10
 xgboost>=2.0
 scikit-learn>=1.4
-shap>=0.45
 torch>=2.2

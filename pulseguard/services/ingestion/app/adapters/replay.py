@@ -17,7 +17,7 @@ Two time modes:
   compressing gaps changes the frequency features (and with them the
   scores): a 30-minute low-and-slow gap replayed at 60x is a 30-second gap.
 
-Each replay runs as a fresh user id (`<corpus user>#<run>`) so two replays of
+Each replay runs as a fresh user id (`<corpus user>~<run>`) so two replays of
 the same episode never merge into one session.
 """
 

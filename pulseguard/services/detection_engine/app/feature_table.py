@@ -184,3 +184,22 @@ def to_model_matrix(feature_table: pd.DataFrame, columns: list[str] = FEATURE_CO
         else:
             matrix[col] = pd.to_numeric(matrix[col], errors="coerce").fillna(0.0)
     return matrix
+
+
+def vector_to_row(vector: dict, columns: list[str] = FEATURE_COLUMNS):
+    """One feature vector -> a float64 row with exactly to_model_matrix's
+    semantics (bool -> 0/1, missing/None/non-numeric -> 0.0), without the
+    pandas overhead -- the live scorer's hot path. A test pins the two
+    together."""
+    import numpy as np
+
+    row = np.zeros(len(columns), dtype=np.float64)
+    for i, col in enumerate(columns):
+        value = vector.get(col)
+        if value is None or isinstance(value, str):
+            try:
+                value = float(value) if value is not None else 0.0
+            except ValueError:
+                value = 0.0
+        row[i] = float(value) if value == value else 0.0  # NaN -> 0.0
+    return row

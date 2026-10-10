@@ -26,6 +26,7 @@ from eval.harness.split import assign_split
 from services.detection_engine.app.episode_eval import best_f1_threshold, episode_frame, evaluate
 from services.detection_engine.app.sequence_dataset import build_sequence_dataset
 from services.detection_engine.app.stage_c_gru import StageCGRU
+from services.detection_engine.app.stage_c_numpy import export_state_dict
 
 logger = logging.getLogger("pulseguard.detection_engine.train_stage_c")
 
@@ -120,6 +121,8 @@ def run(events_path: Path, seed: int, model_out: Path, results_dir: Path) -> dic
 
     model_out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), model_out)
+    # The live scorer runs the GRU in NumPy (stage_c_numpy.py) and reads this.
+    export_state_dict(model.state_dict(), model_out.with_suffix(".npz"))
 
     results_dir.mkdir(parents=True, exist_ok=True)
     (results_dir / "stage_c.json").write_text(json.dumps(results, indent=2, default=str))

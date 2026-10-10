@@ -1,0 +1,14 @@
+# Build-time only, for build machines behind a TLS-intercepting proxy (for
+# example a sandboxed CI/cloud dev box). NOT needed on a normal laptop; the
+# scripts only add it when PULSEGUARD_EXTRA_CA points at a CA bundle:
+#   PULSEGUARD_EXTRA_CA=/path/to/ca.pem ./run.sh
+services:
+  kafka-init: { build: { secrets: [extra_ca] } }
+  ingestion: { build: { secrets: [extra_ca] } }
+  feature_engine: { build: { secrets: [extra_ca] } }
+  detection_engine: { build: { secrets: [extra_ca] } }
+  mitigation: { build: { secrets: [extra_ca] } }
+  dashboard: { build: { secrets: [extra_ca] } }
+secrets:
+  extra_ca:
+    file: ${PULSEGUARD_EXTRA_CA}

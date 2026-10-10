@@ -51,20 +51,20 @@ def test_replay_and_simulator_are_both_telemetry_adapters():
 
 def test_preserve_mode_keeps_original_spacing_and_publishes_fast():
     sleeps = []
-    adapter = ReplayAdapter(_episode(), "u1#ab", time_mode="preserve", pace_seconds=0.5, sleep=sleeps.append)
+    adapter = ReplayAdapter(_episode(), "u1~ab", time_mode="preserve", pace_seconds=0.5, sleep=sleeps.append)
     sink = ListSink()
     assert adapter.run(sink) == 6
     ts = [e.ts for e in sink.events]
     assert (ts[2] - ts[0]) == timedelta(minutes=25)  # corpus gap preserved exactly
     assert ts[-1] <= datetime.now(timezone.utc)  # anchored to end "now", never in the future
-    assert all(e.user_id == "u1#ab" for e in sink.events)
+    assert all(e.user_id == "u1~ab" for e in sink.events)
     assert all(e.ingest_ts == e.ts for e in sink.events)  # recorded episode: corpus ingest timing
     assert sleeps == [0.5] * 5
 
 
 def test_realtime_mode_compresses_gaps_by_speedup():
     sleeps = []
-    adapter = ReplayAdapter(_episode(), "u1#cd", time_mode="realtime", speedup=60.0, sleep=sleeps.append)
+    adapter = ReplayAdapter(_episode(), "u1~cd", time_mode="realtime", speedup=60.0, sleep=sleeps.append)
     sink = ListSink()
     adapter.run(sink)
     assert (sink.events[2].ts - sink.events[0].ts) == timedelta(seconds=25)

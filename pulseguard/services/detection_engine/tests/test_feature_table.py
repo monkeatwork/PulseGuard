@@ -116,3 +116,12 @@ def test_empty_input_returns_empty_table():
                                 "label_attack", "attack_profile"])
     table = build_feature_table(df)
     assert table.empty
+
+
+def test_vector_to_row_matches_to_model_matrix():
+    from services.detection_engine.app.feature_table import vector_to_row
+
+    table = build_feature_table(_build_corpus())
+    matrix = to_model_matrix(table)
+    for i, record in enumerate(table.to_dict("records")):
+        assert list(vector_to_row(record)) == list(matrix.iloc[i].astype(float))

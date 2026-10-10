@@ -1,3 +1,31 @@
+# PulseGuard stack, sized for a laptop with ~1.5 GB of RAM for Docker.
+# Start/stop it with the scripts at the repository root (config-everything,
+# run, stop) rather than by hand. Every service has a hard memory limit;
+# measured usage is recorded in README.md.
+#
+# Only the dashboard is published to the host (default http://localhost:3000);
+# it proxies the service APIs under /api/*, so nothing else needs a host port
+# and nothing clashes with a Postgres/Redis/Kafka already on the laptop.
+
+name: pulseguard
+
+x-python-env: &python-env
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:-pulseguard}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulseguard_dev_password}
+  POSTGRES_DB: ${POSTGRES_DB:-pulseguard}
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  MALLOC_ARENA_MAX: "2"
+
+x-healthcheck: &py-health
+  interval: 5s
+  timeout: 4s
+  retries: 30
+  start_period: 5s
+
 services:
   postgres:
     image: timescale/timescaledb:2.15.0-pg16
@@ -5,187 +33,146 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-pulseguard}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulseguard_dev_password}
       POSTGRES_DB: ${POSTGRES_DB:-pulseguard}
-    ports:
-      - "5432:5432"
+      NO_TS_TUNE: "true"
+    command: >
+      postgres -c shared_buffers=32MB -c effective_cache_size=96MB -c work_mem=2MB
+      -c maintenance_work_mem=16MB -c max_connections=40 -c max_worker_processes=4
+      -c timescaledb.max_background_workers=1 -c timescaledb.telemetry_level=off
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    mem_limit: 192m
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulseguard}"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pulseguard} -d ${POSTGRES_DB:-pulseguard}"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
 
   redis:
     image: redis:7.2-alpine
-    ports:
-      - "6380:6379"
+    command: ["redis-server", "--maxmemory", "32mb", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "no"]
+    mem_limit: 48m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
+      interval: 3s
+      timeout: 3s
+      retries: 40
 
-  redpanda:
-    image: redpandadata/redpanda:v24.1.1
-    command:
-      - redpanda
-      - start
-      - --smp=1
-      - --memory=512M
-      - --overprovisioned
-      - --node-id=0
-      - --check=false
-      # Two listeners, because a Kafka client does not talk to the address
-      # it dialed -- it asks the broker for the cluster's advertised
-      # addresses and reconnects to those. With only the internal listener
-      # advertised as `redpanda:9092`, a client on the HOST connects to
-      # localhost:9092 fine, is told "the broker is at redpanda:9092",
-      # and then fails because that name resolves only inside the compose
-      # network. Publishing the port is not enough; the advertised address
-      # has to be reachable by the client too.
-      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
-      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
-    ports:
-      - "9092:9092"
-      - "19092:19092"
-    healthcheck:
-      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0
-    command: ["start-dev"]
+  kafka:
+    # Apache Kafka as a GraalVM native image, single-node KRaft (no
+    # ZooKeeper): the same Kafka protocol as the JVM broker at a fraction of
+    # the memory. Replaces Redpanda, whose minimum reservation alone was 512 MB.
+    image: apache/kafka-native:3.8.0
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_dev_password}
-    ports:
-      - "8081:8080"
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_HEAP_OPTS: -Xmx192m -Xms64m
+    mem_limit: 384m
 
-  ingestion:
-    build:
+  kafka-init:
+    # One-shot: creates the topics with explicit partition counts, then exits.
+    build: &ingestion-build
       context: .
       dockerfile: services/ingestion/Dockerfile
-    ports:
-      - "8001:8001"
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
-    volumes:
-      # Read-only access to the benchmark corpus -- the replay adapter's
-      # only real event source in this environment (no live IdP). See
-      # services/ingestion/app/adapters/replay.py.
-      - ./data:/srv/data:ro
+    image: pulseguard/ingestion:local
+    command: ["python", "-m", "services.ingestion.app.init_topics"]
+    environment: *python-env
     depends_on:
-      redpanda:
-        condition: service_healthy
+      - kafka
+    restart: on-failure:5
+    mem_limit: 96m
+
+  ingestion:
+    build: *ingestion-build
+    image: pulseguard/ingestion:local
+    environment:
+      <<: *python-env
+      MITIGATION_URL: http://mitigation:8004
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    restart: on-failure
+    mem_limit: 192m
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
-      interval: 5s
-      timeout: 5s
-      retries: 15
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)"]
+      <<: *py-health
 
   feature_engine:
     build:
       context: .
       dockerfile: services/feature_engine/Dockerfile
-    ports:
-      - "8002:8002"
-    environment:
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+    image: pulseguard/feature_engine:local
+    environment: *python-env
     depends_on:
-      redis:
-        condition: service_healthy
-      redpanda:
-        condition: service_healthy
+      redis: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    restart: on-failure
+    mem_limit: 192m
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/health')\""]
-      interval: 5s
-      timeout: 5s
-      retries: 15
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health', timeout=3)"]
+      <<: *py-health
 
   detection_engine:
     build:
       context: .
       dockerfile: services/detection_engine/Dockerfile
-    ports:
-      - "8003:8003"
-    environment:
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_USER: ${POSTGRES_USER:-pulseguard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulseguard_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-pulseguard}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
+    image: pulseguard/detection_engine:local
+    environment: *python-env
     depends_on:
-      postgres:
-        condition: service_healthy
-      redpanda:
-        condition: service_healthy
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    restart: on-failure
+    mem_limit: 256m
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\""]
-      interval: 5s
-      timeout: 5s
-      retries: 15
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health', timeout=3)"]
+      <<: *py-health
 
   mitigation:
     build:
       context: .
       dockerfile: services/mitigation/Dockerfile
-    ports:
-      - "8004:8004"
+    image: pulseguard/mitigation:local
     environment:
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_USER: ${POSTGRES_USER:-pulseguard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulseguard_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-pulseguard}
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-redpanda:9092}
-      IDP_WEBHOOK_URL: ${IDP_WEBHOOK_URL:-http://keycloak:8080}
+      <<: *python-env
+      IDP_WEBHOOK_URL: http://ingestion:8001/idp
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      redpanda:
-        condition: service_healthy
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+    restart: on-failure
+    mem_limit: 128m
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8004/health')\""]
-      interval: 5s
-      timeout: 5s
-      retries: 15
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health', timeout=3)"]
+      <<: *py-health
 
   dashboard:
     build:
       context: .
       dockerfile: services/dashboard/Dockerfile
+    image: pulseguard/dashboard:local
     ports:
-      - "3001:3000"
-    environment:
-      # Browser-side fetches go to the host's published ports, not the
-      # in-network service names -- the dashboard runs in the viewer's
-      # browser, outside the compose network. 127.0.0.1, not localhost:
-      # this host's IPv6 loopback resolution doesn't forward correctly
-      # through Docker Desktop's published ports (diagnosed directly).
-      VITE_DETECTION_ENGINE_URL: http://127.0.0.1:8003
-      VITE_MITIGATION_URL: http://127.0.0.1:8004
+      - "${PULSEGUARD_PORT:-3000}:80"
     depends_on:
+      - ingestion
       - detection_engine
       - mitigation
+      - feature_engine
+    mem_limit: 32m
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 20
 
 volumes:

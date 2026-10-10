@@ -43,7 +43,10 @@ def test_stage_c_reasons_name_sequence_features():
     seq[:5, 0] = 1.0
     seq[:5, 3] = 1.0
     seq[:5, 4] = np.log1p([4000, 3000, 2000, 1000, 600]) / 10
-    reasons = stage_c_reasons(StageCGRU(), seq, 5)
+    from services.detection_engine.app.stage_c_numpy import StageCNumpy
+
+    weights = {k: v.detach().numpy() for k, v in StageCGRU().state_dict().items()}
+    reasons = stage_c_reasons(StageCNumpy(weights), seq, 5)
     assert len(reasons) == 3
     assert all(r["feature"] in STEP_FEATURE_NAMES for r in reasons)
     denials = next((r for r in reasons if r["feature"] == "sequence: denials"), None)

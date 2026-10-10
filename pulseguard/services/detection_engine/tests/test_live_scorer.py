@@ -29,6 +29,7 @@ from services.detection_engine.app.operating_point import (
 )
 from services.detection_engine.app.stage_b_xgboost import save_model, train_stage_b
 from services.detection_engine.app.stage_c_gru import StageCGRU
+from services.detection_engine.app.stage_c_numpy import export_state_dict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 INIT_SQL_PATH = REPO_ROOT / "infra" / "postgres" / "init.sql"
@@ -50,6 +51,7 @@ def model_dir(tmp_path_factory) -> Path:
     save_model(model, d / "stage_b.json")
     save_calibrator(fit_calibrator(model.predict_proba(X[150:])[:, 1], y[150:].to_numpy()), d / "stage_b_calibrator.pkl")
     torch.save(StageCGRU().state_dict(), d / "stage_c.pt")
+    export_state_dict(StageCGRU().state_dict(), d / "stage_c.npz")
     save_operating_point(POINT, d / "operating_point.json")
     return d
 
@@ -62,7 +64,7 @@ def test_live_scorer_runs_at_exactly_the_persisted_operating_point(model_dir):
 
 
 def test_missing_operating_point_raises_instead_of_defaulting(model_dir, tmp_path):
-    for name in ("stage_b.json", "stage_b_calibrator.pkl", "stage_c.pt"):
+    for name in ("stage_b.json", "stage_b_calibrator.pkl", "stage_c.npz"):
         (tmp_path / name).write_bytes((model_dir / name).read_bytes())
     with pytest.raises(OperatingPointMissing):
         LiveScorer(tmp_path)

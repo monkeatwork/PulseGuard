@@ -1,3 +1,9 @@
 # Every text file in this repo is LF. Pin it, so a Windows checkout with
 # core.autocrlf=true cannot hand a CRLF run.sh to a Linux container.
 * text=auto eol=lf
+# Windows launchers must stay CRLF for cmd.exe.
+*.cmd text eol=crlf
+*.parquet binary
+*.npz binary
+*.pkl binary
+*.pt binary

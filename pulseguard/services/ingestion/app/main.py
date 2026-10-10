@@ -155,7 +155,7 @@ def start_replay(req: ReplayRequest) -> dict:
     run_id = str(uuid.uuid4())
     first = episode.iloc[0]
     profile = req.burst_id.split(":")[-2]
-    user_id = f"{first['user_id']}#{run_id[:4]}"
+    user_id = f"{first['user_id']}~{run_id[:4]}"
     adapter = ReplayAdapter(episode, user_id, req.time_mode, req.pace_seconds, req.speedup)
     record = {
         "run_id": run_id, "source": "replay", "user_id": user_id, "profile": profile,

@@ -10,8 +10,9 @@ that had not contributed to the score that fired. Now:
   * the explanation comes from the stage with the largest contribution, and
     is labelled with that stage (`source`);
   * Stage A explains itself (its score IS the most deviant signal);
-    Stage B uses TreeSHAP over XGBoost; Stage C uses gradient x input over
-    the GRU's input sequence, summed per step feature.
+    Stage B uses TreeSHAP over XGBoost; Stage C uses occlusion over the
+    GRU's input sequence -- each step feature is zeroed across the whole
+    sequence and the change in the attack logit is its attribution.
 
 So the reasons shown are always attributable to the component that drove
 the score, and the label says which one it was.
@@ -20,7 +21,6 @@ the score, and the label says which one it was.
 from __future__ import annotations
 
 import numpy as np
-import torch
 
 from services.detection_engine.app.fusion import FusionWeights, normalize_stage_a_score
 from services.detection_engine.app.stage_a_statistical import DRIFT_SLOPE_NORMALIZATION_MS
@@ -68,20 +68,24 @@ def stage_a_reasons(vector: dict) -> list[dict]:
 
 
 def stage_c_reasons(model, seq: np.ndarray, length: int) -> list[dict]:
-    """Gradient x input of the GRU's attack logit w.r.t. its input sequence,
-    summed over time per step feature. Positive = pushed towards attack."""
-    x = torch.tensor(seq[None, ...], dtype=torch.float32, requires_grad=True)
-    model.eval()
-    logit = model(x, torch.tensor([length], dtype=torch.long))
-    logit.sum().backward()
-    attribution = (x.grad[0] * x[0]).detach().numpy()[:length].sum(axis=0)
-    steps = seq[:length]
+    """Occlusion attribution for the GRU (`model` is a StageCNumpy): for each
+    of the six step features, the attack logit minus the logit with that
+    feature zeroed at every step. Positive = that feature pushed the
+    sequence towards "attack"."""
+    base = model.logit(seq, length)
+    attribution = np.zeros(len(STEP_FEATURE_NAMES))
+    for i in range(len(STEP_FEATURE_NAMES)):
+        occluded = np.array(seq, copy=True)
+        occluded[:length, i] = 0.0
+        attribution[i] = base - model.logit(occluded, length)
+    steps = np.asarray(seq)[:length]
+    has_latency = steps[:, 3] > 0
     values = [
         float(steps[:, 0].sum()),  # denials
         float(steps[:, 1].sum()),  # approvals
         float(steps[:, 2].sum()),  # unanswered
-        float(steps[:, 3].sum()),  # with latency
-        float(np.expm1(steps[:, 4][steps[:, 3] > 0] * 10).mean()) if (steps[:, 3] > 0).any() else 0.0,  # mean latency ms
+        float(steps[:, 3].sum()),  # steps with a latency
+        float(np.expm1(steps[has_latency, 4] * 10).mean()) if has_latency.any() else 0.0,  # mean latency ms
         float(np.expm1(steps[1:, 5] * 10).mean()) if length > 1 else 0.0,  # mean gap s
     ]
     order = np.argsort(-np.abs(attribution))[:3]

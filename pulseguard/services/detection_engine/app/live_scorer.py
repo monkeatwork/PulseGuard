@@ -29,7 +29,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-import torch
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -45,13 +44,13 @@ from services.detection_engine.app.explain import (
     stage_c_reasons,
 )
 from services.detection_engine.app.explain_shap import make_explainer, top3_reasons
-from services.detection_engine.app.feature_table import to_model_matrix
+from services.detection_engine.app.feature_table import vector_to_row
 from services.detection_engine.app.fusion import fuse_scores
 from services.detection_engine.app.operating_point import OperatingPoint, load_operating_point
 from services.detection_engine.app.sequence_dataset import pairs_to_sequence
 from services.detection_engine.app.stage_a_statistical import stage_a_score
 from services.detection_engine.app.stage_b_xgboost import load_model
-from services.detection_engine.app.stage_c_gru import StageCGRU
+from services.detection_engine.app.stage_c_numpy import StageCNumpy
 
 logger = logging.getLogger("pulseguard.detection_engine.live_scorer")
 
@@ -59,8 +58,6 @@ KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"
 ENRICHED_TOPIC = "pulseguard.events.enriched"
 ALERTS_TOPIC = "pulseguard.alerts"
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "/srv/services/detection_engine/app/model_registry"))
-
-torch.set_num_threads(1)  # one small GRU per message; threads only add contention
 
 
 class ModelArtifactMissing(RuntimeError):
@@ -89,15 +86,18 @@ class LiveScorer:
         self.weights = self.operating_point.weights
         self.threshold = self.operating_point.threshold
 
-        for name in ("stage_b.json", "stage_b_calibrator.pkl", "stage_c.pt"):
+        for name in ("stage_b.json", "stage_b_calibrator.pkl", "stage_c.npz"):
             if not (model_dir / name).exists():
                 raise ModelArtifactMissing(f"{model_dir / name} not found")
         self._stage_b = load_model(model_dir / "stage_b.json")
+        # One row per call: XGBoost's default thread pool costs ~10 ms to spin
+        # up per prediction, more than the prediction itself.
+        self._stage_b.set_params(n_jobs=1)
+        self._booster = self._stage_b.get_booster()
         self._calibrator = load_calibrator(model_dir / "stage_b_calibrator.pkl")
         self._explainer = make_explainer(self._stage_b)
-        self._stage_c = StageCGRU()
-        self._stage_c.load_state_dict(torch.load(model_dir / "stage_c.pt", weights_only=True))
-        self._stage_c.eval()
+        # NumPy forward pass of the trained GRU (stage_c_numpy.py): no torch at runtime.
+        self._stage_c = StageCNumpy.load(model_dir / "stage_c.npz")
         logger.info(
             "Live scorer at operating point weights=(%.2f, %.2f, %.2f) threshold=%.2f",
             self.weights.weight_a, self.weights.weight_b, self.weights.weight_c, self.threshold,
@@ -105,16 +105,13 @@ class LiveScorer:
 
     def score_message(self, message: dict) -> dict:
         vector = message["feature_vector"]
-        table = pd.DataFrame([vector])
 
         stage_a = stage_a_score(vector)
-        raw_b = float(self._stage_b.predict_proba(to_model_matrix(table))[:, 1][0])
+        raw_b = float(self._booster.inplace_predict(vector_to_row(vector)[None, :])[0])
         stage_b = float(calibrate(self._calibrator, [raw_b])[0])
 
         seq, length = pairs_to_sequence(session_pairs(_sequence_events(message.get("sequence", []))))
-        with torch.no_grad():
-            logit = self._stage_c(torch.tensor(seq[None, ...]), torch.tensor([length], dtype=torch.long))
-        stage_c = float(torch.sigmoid(logit).item())
+        stage_c = self._stage_c.proba(seq, length)
 
         fused = fuse_scores(stage_a, stage_b, stage_c, self.weights)
         return {
@@ -124,7 +121,6 @@ class LiveScorer:
             "fused_score": fused,
             "raised": fused >= self.threshold,
             "_seq": (seq, length),
-            "_table": table,
         }
 
     def explain(self, message: dict, scores: dict) -> dict:
@@ -133,7 +129,7 @@ class LiveScorer:
         if source == "stage_a":
             reasons = stage_a_reasons(message["feature_vector"])
         elif source == "stage_b":
-            reasons = top3_reasons(self._explainer, scores["_table"])
+            reasons = top3_reasons(self._explainer, pd.DataFrame([message["feature_vector"]]))
         else:
             seq, length = scores["_seq"]
             reasons = stage_c_reasons(self._stage_c, seq, length)
