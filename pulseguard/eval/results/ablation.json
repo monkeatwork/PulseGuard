@@ -1,0 +1,214 @@
+{
+  "seed": 42,
+  "noise_floor_percentage_points": 2.0,
+  "variants": {
+    "frequency_only": {
+      "overall": {
+        "tp": 7763,
+        "fp": 15845,
+        "tn": 6679,
+        "fn": 982,
+        "precision": 0.32882921043714,
+        "recall": 0.8877072612921669,
+        "fpr": 0.7034718522464927
+      },
+      "by_profile": {
+        "low_and_slow": {
+          "tp": 6197,
+          "fp": 0,
+          "tn": 0,
+          "fn": 982,
+          "precision": 1.0,
+          "recall": 0.8632121465385151,
+          "fpr": null
+        },
+        "social_engineering_assisted": {
+          "tp": 781,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "fpr": null
+        },
+        "high_volume_burst": {
+          "tp": 785,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "fpr": null
+        },
+        "benign_high_activity": {
+          "tp": 0,
+          "fp": 15845,
+          "tn": 6679,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": null,
+          "fpr": 0.7034718522464927
+        }
+      },
+      "n_features": 9,
+      "features": [
+        "n_prompts",
+        "prompts_per_window",
+        "inter_prompt_mean",
+        "inter_prompt_std",
+        "burst_duration_seconds",
+        "off_hours_flag",
+        "geo_novelty",
+        "device_novelty",
+        "baseline_is_cold_start"
+      ],
+      "threshold": 0.17
+    },
+    "frequency_plus_response_behaviour": {
+      "overall": {
+        "tp": 8098,
+        "fp": 753,
+        "tn": 21771,
+        "fn": 647,
+        "precision": 0.9149248672466388,
+        "recall": 0.9260148656375071,
+        "fpr": 0.03343100692594566
+      },
+      "by_profile": {
+        "low_and_slow": {
+          "tp": 6532,
+          "fp": 0,
+          "tn": 0,
+          "fn": 647,
+          "precision": 1.0,
+          "recall": 0.9098760273018526,
+          "fpr": null
+        },
+        "social_engineering_assisted": {
+          "tp": 781,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "fpr": null
+        },
+        "high_volume_burst": {
+          "tp": 785,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "fpr": null
+        },
+        "benign_high_activity": {
+          "tp": 0,
+          "fp": 753,
+          "tn": 21771,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": null,
+          "fpr": 0.03343100692594566
+        }
+      },
+      "n_features": 19,
+      "features": [
+        "n_prompts",
+        "prompts_per_window",
+        "inter_prompt_mean",
+        "inter_prompt_std",
+        "burst_duration_seconds",
+        "off_hours_flag",
+        "geo_novelty",
+        "device_novelty",
+        "deny_run_length",
+        "capitulation_flag",
+        "approval_latency_z",
+        "approval_latency_z_valid",
+        "latency_drift_slope",
+        "latency_drift_slope_valid",
+        "post_burst_approval_gap_seconds",
+        "post_burst_approval_gap_valid",
+        "denial_latency_variance",
+        "denial_latency_variance_valid",
+        "baseline_is_cold_start"
+      ],
+      "threshold": 0.11
+    },
+    "response_behaviour_minus_latency_drift_slope": {
+      "overall": {
+        "tp": 8098,
+        "fp": 753,
+        "tn": 21771,
+        "fn": 647,
+        "precision": 0.9149248672466388,
+        "recall": 0.9260148656375071,
+        "fpr": 0.03343100692594566
+      },
+      "by_profile": {
+        "low_and_slow": {
+          "tp": 6532,
+          "fp": 0,
+          "tn": 0,
+          "fn": 647,
+          "precision": 1.0,
+          "recall": 0.9098760273018526,
+          "fpr": null
+        },
+        "social_engineering_assisted": {
+          "tp": 781,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "fpr": null
+        },
+        "high_volume_burst": {
+          "tp": 785,
+          "fp": 0,
+          "tn": 0,
+          "fn": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "fpr": null
+        },
+        "benign_high_activity": {
+          "tp": 0,
+          "fp": 753,
+          "tn": 21771,
+          "fn": 0,
+          "precision": 0.0,
+          "recall": null,
+          "fpr": 0.03343100692594566
+        }
+      },
+      "n_features": 17,
+      "features": [
+        "n_prompts",
+        "prompts_per_window",
+        "inter_prompt_mean",
+        "inter_prompt_std",
+        "burst_duration_seconds",
+        "off_hours_flag",
+        "geo_novelty",
+        "device_novelty",
+        "deny_run_length",
+        "capitulation_flag",
+        "approval_latency_z",
+        "approval_latency_z_valid",
+        "post_burst_approval_gap_seconds",
+        "post_burst_approval_gap_valid",
+        "denial_latency_variance",
+        "denial_latency_variance_valid",
+        "baseline_is_cold_start"
+      ],
+      "threshold": 0.11
+    }
+  },
+  "response_behaviour_lift_percentage_points": 3.8307604345340196,
+  "latency_drift_slope_lift_percentage_points": 0.0,
+  "no_measurable_lift_response_behaviour": false,
+  "no_measurable_lift_latency_drift_slope": true
+}

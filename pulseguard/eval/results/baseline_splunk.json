@@ -1,0 +1,51 @@
+{
+  "split": "test",
+  "n_bursts_evaluated": 3859,
+  "overall": {
+    "tp": 781,
+    "fp": 0,
+    "tn": 1537,
+    "fn": 1541,
+    "precision": 1.0,
+    "recall": 0.3363479758828596,
+    "fpr": 0.0
+  },
+  "by_profile": {
+    "low_and_slow": {
+      "tp": 0,
+      "fp": 0,
+      "tn": 0,
+      "fn": 756,
+      "precision": null,
+      "recall": 0.0,
+      "fpr": null
+    },
+    "social_engineering_assisted": {
+      "tp": 0,
+      "fp": 0,
+      "tn": 0,
+      "fn": 781,
+      "precision": null,
+      "recall": 0.0,
+      "fpr": null
+    },
+    "high_volume_burst": {
+      "tp": 781,
+      "fp": 0,
+      "tn": 0,
+      "fn": 4,
+      "precision": 1.0,
+      "recall": 0.9949044585987261,
+      "fpr": null
+    },
+    "benign_high_activity": {
+      "tp": 0,
+      "fp": 0,
+      "tn": 1537,
+      "fn": 0,
+      "precision": null,
+      "recall": null,
+      "fpr": 0.0
+    }
+  }
+}

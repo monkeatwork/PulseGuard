@@ -1,0 +1,10 @@
+PPT should include the following:
+
+1. Introduction
+2. Problem Statement
+3. Existing Solutions
+4. Research Gap
+5. Novelty
+6. Proposed Architecture
+7. Technology Stack
+8. Implementation Plan

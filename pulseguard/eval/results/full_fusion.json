@@ -1,0 +1,57 @@
+{
+  "split": "test",
+  "n_episodes_evaluated": 3859,
+  "weights": {
+    "a": 0.0,
+    "b": 0.0,
+    "c": 1.0
+  },
+  "threshold": 0.01,
+  "overall": {
+    "tp": 2322,
+    "fp": 0,
+    "tn": 1537,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "fpr": 0.0
+  },
+  "by_profile": {
+    "low_and_slow": {
+      "tp": 756,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "fpr": null
+    },
+    "social_engineering_assisted": {
+      "tp": 781,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "fpr": null
+    },
+    "high_volume_burst": {
+      "tp": 785,
+      "fp": 0,
+      "tn": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "fpr": null
+    },
+    "benign_high_activity": {
+      "tp": 0,
+      "fp": 0,
+      "tn": 1537,
+      "fn": 0,
+      "precision": null,
+      "recall": null,
+      "fpr": 0.0
+    }
+  }
+}

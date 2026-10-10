@@ -1,0 +1,30 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+node_modules/
+dist/
+build/
+
+# Fetched dataset (large, downloaded via `make data`) — never committed.
+# data/manifests/ IS tracked: it's the small, machine-readable pin of the
+# dataset checksum/date and belongs in version control (see DECISIONS.md).
+data/raw/*
+!data/raw/.gitkeep
+
+# Generated benchmark corpora — reproducible from a seed via cli.py, never committed
+data/generated*/
+
+# eval/results/*.json IS tracked: these are the actual reported precision/
+# recall/FPR numbers (baselines, ablation, adversarial) that the project's
+# claims are measured against — small files, and the whole point is that
+# they're committed evidence, not scratch output.
+
+# Model artifacts
+services/detection_engine/app/model_registry/*
+!services/detection_engine/app/model_registry/.gitkeep
+
+.env
+*.log

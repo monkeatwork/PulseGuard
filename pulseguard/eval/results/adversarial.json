@@ -1,0 +1,46 @@
+{
+  "n_adversarial_episodes": 400,
+  "baselines": {
+    "splunk": {
+      "mimicry_adversarial": {
+        "recall": 0.025,
+        "n": 200
+      },
+      "slow_pacing_adversarial": {
+        "recall": 0.0,
+        "n": 200
+      }
+    },
+    "elastic": {
+      "mimicry_adversarial": {
+        "recall": 0.11,
+        "n": 200
+      },
+      "slow_pacing_adversarial": {
+        "recall": 0.0,
+        "n": 200
+      }
+    }
+  },
+  "stage_ab": {
+    "mimicry_adversarial": {
+      "recall": 0.9279385705847608,
+      "n": 1693
+    },
+    "slow_pacing_adversarial": {
+      "recall": 0.9211340206185566,
+      "n": 1940
+    }
+  },
+  "stage_c": {
+    "mimicry_adversarial": {
+      "recall": 1.0,
+      "n": 200
+    },
+    "slow_pacing_adversarial": {
+      "recall": 1.0,
+      "n": 200
+    }
+  },
+  "anti_dos_invariant_holds_under_mimicry_pacing": true
+}

@@ -1,0 +1,9 @@
+{
+  "record_id": "6782156",
+  "filename": "rba-dataset.zip",
+  "url": "https://zenodo.org/api/records/6782156/files/rba-dataset.zip/content",
+  "expected_md5": "cc1b1078b3929650e6c08678caffcc57",
+  "actual_md5": "cc1b1078b3929650e6c08678caffcc57",
+  "size_bytes": 1093700330,
+  "downloaded_at": "2026-09-20T14:18:04.263782+00:00"
+}

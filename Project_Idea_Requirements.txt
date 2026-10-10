@@ -1,0 +1,9 @@
+
+Problem understanding
+* Literature survey (minimum 5 recent research papers published between 2022 and 2026)
+* Existing work analysis
+* Clearly defined novelty
+* System architecture and workflow
+* Technology stack
+* Implementation plan
+* PowerPoint presentation
