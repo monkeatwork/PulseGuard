@@ -500,3 +500,65 @@ Training still uses torch, offline. A side effect: per-decision scoring dropped 
 ## 2026-10-11 — Report renderer edited for labels only (harness rule 8)
 
 `eval/harness/report.py` is part of the frozen harness. It was edited only to change presentation: the stale "(fragment-level)" label became "Stage A+B", a "Full fusion" row was added to the adversarial table, the operating point and unit are printed, and the ablation's supplementary deltas are shown. No metric computation in `eval/harness/` changed (`split.py`, `metrics.py` and `run_eval.py` are untouched). The ablation still reports the recall-based lift with its automatic, non-suppressible banner. F1, FPR and average-precision deltas are added *alongside* it, because recall can saturate at the operating threshold and hide a difference that shows up elsewhere.
+
+## 2026-10-11 — Remediation, part 2: re-measured results (one retrain-and-re-evaluate pass)
+
+All numbers below come from `eval/results/*.json` on the regenerated corpus.
+- **Dataset:** RBA archive re-fetched from Zenodo and MD5-verified.
+- **Corpus:** seed 42, 50,000 users, 749,744 events, `events_sha256` 71637af8…
+- **Determinism:** a second generation from the same seed was byte-identical.
+- **Test split:** 3,859 episodes, by user.
+
+**Industry baselines, re-reproduced on the new corpus:**
+- Splunk: recall 0.337, precision 1.000, FPR 0.000 (was 0.336 / 1.000 / 0.000).
+- Elastic: recall 0.610, precision 0.997, FPR **0.003** (was 0.623 / 1.000 / 0.000). Elastic got slightly *worse*, and for an understood reason: A3 gave the benign high-activity users genuine denials, so "two denials then a success" now fires on a few honest users.
+
+**A4 (lengths overlap), measured** (`episode_lengths.json`): prompts per episode, p5–p95.
+
+| Profile | p5–p95 |
+|---|---|
+| Benign power user | 8–41 |
+| Occasional denial | 2–8 |
+| High-volume burst | 7–25 |
+| Low-and-slow | 4–14 |
+| Social-engineering assisted | 3–11 |
+
+Every attack profile overlaps at least one benign profile.
+
+**B1/B5: Stage C, the second mandatory disclosure.** Stage C dropped from 1.000 / 1.000 / FPR 0.000 to recall **0.993**, precision 1.000, FPR **0.001**. The drop is small. With length no longer a give-away, the GRU still separates the classes on decision content, but it is no longer perfect, and the old perfect score is not a result to quote.
+
+**B3: the fusion outcome.** The validation search (0.05 grid, average-precision tie-break) now chooses a genuine mixture: **A = 0.10, B = 0.85, C = 0.05**, threshold **0.67**. It is no longer the old (0, 0, 1) collapse to Stage C. On test, full fusion scores recall **1.000**, precision **0.999**, FPR **0.0013** (TP 2321, FP 2, TN 1535, FN 1). The "weighted fusion of three stages" claim therefore holds in the narrow sense that all three weights are non-zero, but the honest description is that **Stage B dominates**. Stages A and C contribute small corrections. The explanations follow from this (B4): almost every alert is explained by Stage B's TreeSHAP.
+
+**Stage A as a standalone rule is not usable at session granularity, and this is reported, not tuned away.**
+- "Stage A OR Stage B" (the historical Stage A+B row): recall 1.000, FPR **0.633**. Was 0.936 / 0.088 at fragment level, a different unit.
+- Stage A alone: FPR 0.633. Stage B alone: recall 0.999, FPR 0.001.
+
+Both halves are now reported separately (`stage_ab.json`: `stage_a_only`, `stage_b_only`). A diagnostic on held-out benign rows found that Stage A's firings come mostly from `latency_drift_slope` (3,122 of 4,067) and the approval z-score (945). A benign session's first few decision points have only 2–4 latencies, and a fixed |slope| > 1000 ms/prompt rule is noise there. Stage A's constants (`DRIFT_SLOPE_NORMALIZATION_MS = 500`, flag threshold 2.0) were deliberately **not** changed after seeing this, because that would be tuning on observed test behaviour. The validation-tuned fusion gives Stage A a weight of 0.10, which is what neutralises it in the deployed system.
+
+**B5: `latency_drift_slope`, the first mandatory disclosure — still no measurable lift.**
+- Ablation recall: frequency-only 0.991, full 0.999, full minus slope 1.000.
+- Slope lift: **−0.1 pp**, and the automatic NO MEASURABLE LIFT banner fires.
+- Supplementary: F1 −0.0002; FPR 0.0007 lower *with* the slope, about one episode; average precision −0.0002.
+
+The structural cause found earlier (the slope was undefined at fragment granularity) is fixed: the slope is now computed across whole sessions, including low-and-slow. It still adds nothing measurable, for two reasons that are properties of this benchmark:
+- High-volume and social-engineering attacks are already separated by `deny_run_length`, `capitulation_flag` and the windowed prompt count, which co-vary with the fatigue decay.
+- The generator models low-and-slow attacks with no within-episode fatigue drift at all, so the slope has nothing to find there by construction.
+
+The CLAUDE.md sentence calling it "the single most important feature in the system" is therefore **a hypothesis this benchmark does not support**; the measurement stands. A benchmark that models fatigue drift for paced attacks, or real human-subjects latency traces, would be needed to test it.
+
+**The response-behaviour family as a whole.** Recall lift is **0.8 pp**, below the 2-point floor, so that banner fires too. The family's measured contribution is on **false positives**: FPR falls from **0.069** with frequency features only to **0.0007** with response behaviour (precision 0.956 → 1.000, F1 +0.026). This is the honest form of the project's claim on this benchmark: reading the user's reaction is what stops the benign power users from being flagged.
+
+**Adversarial**, at the persisted operating point (the old run used ad-hoc 0.5 thresholds):
+- Mimicry recall: Splunk 0.025, Elastic 0.110, Stage A+B / Stage C / fusion 0.935.
+- Slow-pacing recall: Splunk 0.000, Elastic 0.000, Stage A+B / Stage C / fusion 1.000.
+- The anti-DoS invariant **holds**.
+
+**Live path = evaluated path (A2/B2), checked end to end.** With `./run.sh`, all 60 shipped demo episodes (12 per profile, test-split users only) were replayed through ingestion → Kafka → feature engine → detection → mitigation. **60/60** were judged correctly: all 36 attacks raised an alert and a step-up challenge, and none of the 24 benign episodes alerted. There were 0 dead letters. Scoring latency was **1.48 ms p50 / 2.72 ms p95** per decision. The whole stack used about **845 MB** under that load. The ingestion limit was raised from 192 MB to 256 MB after it peaked at 161 MB.
+
+**Where things got worse, in one place:**
+- Elastic FPR: 0.000 → 0.003.
+- Stage C: 1.000 → 0.993 recall, 0.000 → 0.001 FPR.
+- Fusion FPR: 0.000 → 0.0013.
+- Stage A+B is now reported at episode granularity, where its FPR is 0.633.
+
+None of these was tuned back.

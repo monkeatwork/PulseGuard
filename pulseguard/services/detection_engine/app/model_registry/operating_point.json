@@ -1,0 +1,13 @@
+{
+  "weight_a": 0.1,
+  "weight_b": 0.85,
+  "weight_c": 0.05,
+  "threshold": 0.67,
+  "stage_b_threshold": 0.74,
+  "stage_c_threshold": 0.74,
+  "seed": 42,
+  "events_sha256": "71637af8dabe4293b9c6fe1c36fa8f9a2f856811df6ac51c841ec142ba91ace3",
+  "tuned_on": "val",
+  "unit": "episode (positive if any decision point crosses the threshold)",
+  "created_at": "2026-10-10T23:34:29.373454+00:00"
+}

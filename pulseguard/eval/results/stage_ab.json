@@ -1,24 +1,25 @@
 {
   "split": "test",
-  "n_bursts_evaluated": 31269,
-  "threshold": 0.16,
+  "unit": "episode (positive if any decision point crosses the threshold)",
+  "n_episodes_evaluated": 3859,
+  "n_bursts_evaluated": 3859,
   "overall": {
-    "tp": 8187,
-    "fp": 1971,
-    "tn": 20553,
-    "fn": 558,
-    "precision": 0.8059657412876551,
-    "recall": 0.9361921097770154,
-    "fpr": 0.08750665956313265
+    "tp": 2322,
+    "fp": 973,
+    "tn": 564,
+    "fn": 0,
+    "precision": 0.7047040971168437,
+    "recall": 1.0,
+    "fpr": 0.6330513988288874
   },
   "by_profile": {
     "low_and_slow": {
-      "tp": 6621,
+      "tp": 756,
       "fp": 0,
       "tn": 0,
-      "fn": 558,
+      "fn": 0,
       "precision": 1.0,
-      "recall": 0.92227329711659,
+      "recall": 1.0,
       "fpr": null
     },
     "social_engineering_assisted": {
@@ -41,12 +42,113 @@
     },
     "benign_high_activity": {
       "tp": 0,
-      "fp": 1971,
-      "tn": 20553,
+      "fp": 973,
+      "tn": 564,
       "fn": 0,
       "precision": 0.0,
       "recall": null,
-      "fpr": 0.08750665956313265
+      "fpr": 0.6330513988288874
     }
-  }
+  },
+  "threshold": 0.74,
+  "stage_b_only": {
+    "overall": {
+      "tp": 2319,
+      "fp": 1,
+      "tn": 1536,
+      "fn": 3,
+      "precision": 0.9995689655172414,
+      "recall": 0.9987080103359173,
+      "fpr": 0.0006506180871828237
+    },
+    "by_profile": {
+      "low_and_slow": {
+        "tp": 756,
+        "fp": 0,
+        "tn": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "fpr": null
+      },
+      "social_engineering_assisted": {
+        "tp": 778,
+        "fp": 0,
+        "tn": 0,
+        "fn": 3,
+        "precision": 1.0,
+        "recall": 0.9961587708066582,
+        "fpr": null
+      },
+      "high_volume_burst": {
+        "tp": 785,
+        "fp": 0,
+        "tn": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "fpr": null
+      },
+      "benign_high_activity": {
+        "tp": 0,
+        "fp": 1,
+        "tn": 1536,
+        "fn": 0,
+        "precision": 0.0,
+        "recall": null,
+        "fpr": 0.0006506180871828237
+      }
+    }
+  },
+  "stage_a_only": {
+    "overall": {
+      "tp": 2229,
+      "fp": 973,
+      "tn": 564,
+      "fn": 93,
+      "precision": 0.6961274203622736,
+      "recall": 0.9599483204134367,
+      "fpr": 0.6330513988288874
+    },
+    "by_profile": {
+      "low_and_slow": {
+        "tp": 683,
+        "fp": 0,
+        "tn": 0,
+        "fn": 73,
+        "precision": 1.0,
+        "recall": 0.9034391534391535,
+        "fpr": null
+      },
+      "social_engineering_assisted": {
+        "tp": 761,
+        "fp": 0,
+        "tn": 0,
+        "fn": 20,
+        "precision": 1.0,
+        "recall": 0.9743918053777209,
+        "fpr": null
+      },
+      "high_volume_burst": {
+        "tp": 785,
+        "fp": 0,
+        "tn": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "fpr": null
+      },
+      "benign_high_activity": {
+        "tp": 0,
+        "fp": 973,
+        "tn": 564,
+        "fn": 0,
+        "precision": 0.0,
+        "recall": null,
+        "fpr": 0.6330513988288874
+      }
+    }
+  },
+  "stage_a_threshold": 2.0,
+  "n_decision_points_trained_on": 209117
 }

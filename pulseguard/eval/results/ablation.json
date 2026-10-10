@@ -4,22 +4,24 @@
   "variants": {
     "frequency_only": {
       "overall": {
-        "tp": 7763,
-        "fp": 15845,
-        "tn": 6679,
-        "fn": 982,
-        "precision": 0.32882921043714,
-        "recall": 0.8877072612921669,
-        "fpr": 0.7034718522464927
+        "tp": 2300,
+        "fp": 106,
+        "tn": 1431,
+        "fn": 22,
+        "precision": 0.9559434746467166,
+        "recall": 0.9905254091300603,
+        "fpr": 0.06896551724137931
       },
+      "f1": 0.9729272419627749,
+      "average_precision": 0.9972989562105862,
       "by_profile": {
         "low_and_slow": {
-          "tp": 6197,
+          "tp": 734,
           "fp": 0,
           "tn": 0,
-          "fn": 982,
+          "fn": 22,
           "precision": 1.0,
-          "recall": 0.8632121465385151,
+          "recall": 0.9708994708994709,
           "fpr": null
         },
         "social_engineering_assisted": {
@@ -42,14 +44,15 @@
         },
         "benign_high_activity": {
           "tp": 0,
-          "fp": 15845,
-          "tn": 6679,
+          "fp": 106,
+          "tn": 1431,
           "fn": 0,
           "precision": 0.0,
           "recall": null,
-          "fpr": 0.7034718522464927
+          "fpr": 0.06896551724137931
         }
       },
+      "n_episodes_evaluated": 3859,
       "n_features": 9,
       "features": [
         "n_prompts",
@@ -62,35 +65,37 @@
         "device_novelty",
         "baseline_is_cold_start"
       ],
-      "threshold": 0.17
+      "threshold": 0.87
     },
     "frequency_plus_response_behaviour": {
       "overall": {
-        "tp": 8098,
-        "fp": 753,
-        "tn": 21771,
-        "fn": 647,
-        "precision": 0.9149248672466388,
-        "recall": 0.9260148656375071,
-        "fpr": 0.03343100692594566
+        "tp": 2319,
+        "fp": 1,
+        "tn": 1536,
+        "fn": 3,
+        "precision": 0.9995689655172414,
+        "recall": 0.9987080103359173,
+        "fpr": 0.0006506180871828237
       },
+      "f1": 0.9991383024558379,
+      "average_precision": 0.999762136572779,
       "by_profile": {
         "low_and_slow": {
-          "tp": 6532,
-          "fp": 0,
-          "tn": 0,
-          "fn": 647,
-          "precision": 1.0,
-          "recall": 0.9098760273018526,
-          "fpr": null
-        },
-        "social_engineering_assisted": {
-          "tp": 781,
+          "tp": 756,
           "fp": 0,
           "tn": 0,
           "fn": 0,
           "precision": 1.0,
           "recall": 1.0,
+          "fpr": null
+        },
+        "social_engineering_assisted": {
+          "tp": 778,
+          "fp": 0,
+          "tn": 0,
+          "fn": 3,
+          "precision": 1.0,
+          "recall": 0.9961587708066582,
           "fpr": null
         },
         "high_volume_burst": {
@@ -104,14 +109,15 @@
         },
         "benign_high_activity": {
           "tp": 0,
-          "fp": 753,
-          "tn": 21771,
+          "fp": 1,
+          "tn": 1536,
           "fn": 0,
           "precision": 0.0,
           "recall": null,
-          "fpr": 0.03343100692594566
+          "fpr": 0.0006506180871828237
         }
       },
+      "n_episodes_evaluated": 3859,
       "n_features": 19,
       "features": [
         "n_prompts",
@@ -134,35 +140,37 @@
         "denial_latency_variance_valid",
         "baseline_is_cold_start"
       ],
-      "threshold": 0.11
+      "threshold": 0.75
     },
     "response_behaviour_minus_latency_drift_slope": {
       "overall": {
-        "tp": 8098,
-        "fp": 753,
-        "tn": 21771,
-        "fn": 647,
-        "precision": 0.9149248672466388,
-        "recall": 0.9260148656375071,
-        "fpr": 0.03343100692594566
+        "tp": 2321,
+        "fp": 2,
+        "tn": 1535,
+        "fn": 1,
+        "precision": 0.9991390443392165,
+        "recall": 0.9995693367786391,
+        "fpr": 0.0013012361743656475
       },
+      "f1": 0.9993541442411196,
+      "average_precision": 0.9999634430746629,
       "by_profile": {
         "low_and_slow": {
-          "tp": 6532,
-          "fp": 0,
-          "tn": 0,
-          "fn": 647,
-          "precision": 1.0,
-          "recall": 0.9098760273018526,
-          "fpr": null
-        },
-        "social_engineering_assisted": {
-          "tp": 781,
+          "tp": 756,
           "fp": 0,
           "tn": 0,
           "fn": 0,
           "precision": 1.0,
           "recall": 1.0,
+          "fpr": null
+        },
+        "social_engineering_assisted": {
+          "tp": 780,
+          "fp": 0,
+          "tn": 0,
+          "fn": 1,
+          "precision": 1.0,
+          "recall": 0.998719590268886,
           "fpr": null
         },
         "high_volume_burst": {
@@ -176,14 +184,15 @@
         },
         "benign_high_activity": {
           "tp": 0,
-          "fp": 753,
-          "tn": 21771,
+          "fp": 2,
+          "tn": 1535,
           "fn": 0,
           "precision": 0.0,
           "recall": null,
-          "fpr": 0.03343100692594566
+          "fpr": 0.0013012361743656475
         }
       },
+      "n_episodes_evaluated": 3859,
       "n_features": 17,
       "features": [
         "n_prompts",
@@ -204,11 +213,19 @@
         "denial_latency_variance_valid",
         "baseline_is_cold_start"
       ],
-      "threshold": 0.11
+      "threshold": 0.75
     }
   },
-  "response_behaviour_lift_percentage_points": 3.8307604345340196,
-  "latency_drift_slope_lift_percentage_points": 0.0,
-  "no_measurable_lift_response_behaviour": false,
-  "no_measurable_lift_latency_drift_slope": true
+  "response_behaviour_lift_percentage_points": 0.818260120585701,
+  "latency_drift_slope_lift_percentage_points": -0.08613264427218548,
+  "no_measurable_lift_response_behaviour": true,
+  "no_measurable_lift_latency_drift_slope": true,
+  "supplementary": {
+    "response_behaviour_f1_delta": 0.026211060493062988,
+    "response_behaviour_fpr_delta": -0.06831489915419649,
+    "response_behaviour_average_precision_delta": 0.0024631803621928405,
+    "latency_drift_slope_f1_delta": -0.00021584178528166742,
+    "latency_drift_slope_fpr_delta": -0.0006506180871828237,
+    "latency_drift_slope_average_precision_delta": -0.00020130650188388
+  }
 }

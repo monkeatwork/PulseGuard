@@ -44,7 +44,7 @@ export default function ScoreTrajectoryChart({ trajectory = [], threshold, heigh
             {threshold != null && <ReferenceLine y={threshold} stroke="var(--critical)" strokeWidth={1.5} />}
             {first && (
               <ReferenceLine x={first.n} stroke="var(--axis)"
-                label={{ value: `alert @ decision ${first.n}`, position: "insideTopLeft", fill: "var(--ink-2)", fontSize: 11 }} />
+                label={{ value: `alert @ decision ${first.n}`, position: first.n > data.length / 2 ? "insideTopRight" : "insideTopLeft", fill: "var(--ink-2)", fontSize: 11 }} />
             )}
           </ComposedChart>
         </ResponsiveContainer>

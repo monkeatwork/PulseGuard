@@ -29,7 +29,7 @@ No peer-reviewed work in a credible venue detects MFA fatigue by jointly modelli
 | `deny_run_length` | Consecutive denials before any approval |
 | `capitulation_flag` | The deny → deny → … → approve signature |
 | `approval_latency_z` | Approval latency scored against that user's own historical distribution |
-| `latency_drift_slope` | **Linear regression slope over decision latencies within one burst.** Strongly negative only under fatigue. The single most important feature in the system. |
+| `latency_drift_slope` | **Linear regression slope over decision latencies across the session.** Strongly negative only under fatigue. Designed as the central feature; on the current benchmark its individual ablation shows **no measurable lift** (−0.1 pp recall) — a measured result, reported as such (DECISIONS.md, 2026-10-11 part 2). The response-behaviour family as a whole cuts FPR from 0.069 to 0.001. |
 | `post_burst_approval_gap` | Interval between the final denial and the eventual approval |
 | `denial_latency_variance` | Spread of denial response times within the burst |
 

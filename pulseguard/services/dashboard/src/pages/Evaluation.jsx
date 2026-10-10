@@ -216,7 +216,12 @@ function Ablation({ ab }) {
         {ab.no_measurable_lift_response_behaviour && (
           <div className="banner warning small">
             <AlertTriangle size={16} />
-            <span><b>No measurable lift</b> from the response-behaviour family on this benchmark.</span>
+            <span>
+              <b>No measurable recall lift</b> from the response-behaviour family (below the {ab.noise_floor_percentage_points}-point floor).
+              {sup && sup.response_behaviour_fpr_delta < 0 && (
+                <> Its measured effect is on false positives: FPR {fmtPct(ab.variants.frequency_only.overall.fpr)} → {fmtPct(ab.variants.frequency_plus_response_behaviour.overall.fpr, 2)}.</>
+              )}
+            </span>
           </div>
         )}
       </div>
