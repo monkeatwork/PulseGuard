@@ -1,9 +1,9 @@
-"""Verifies build_feature_table correctly decomposes a low_and_slow
-generator burst into many single-event gap-based bursts (each still
-labelled attack via its parent burst_id), while a high_volume_burst stays
-as one cohesive multi-event row — the exact distinction DECISIONS.md's
-"Correction: Phase 4's planned low-and-slow recall target was wrong"
-depends on.
+"""Verifies build_feature_table's session-level, decision-point unit
+(DECISIONS.md 2026-10-11, "Session-level scoring"): one row per decision,
+each featurising the session-so-far. In particular a low_and_slow episode
+paced 25 minutes apart is ONE session whose final row sees the whole deny
+run and a valid latency_drift_slope (REMEDIATION_TASK.md A1 verification),
+where the old per-fragment unit saw five isolated single prompts.
 """
 
 from __future__ import annotations
@@ -48,34 +48,58 @@ def _build_corpus() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_high_volume_burst_stays_as_one_cohesive_row():
-    df = _build_corpus()
-    table = build_feature_table(df)
+def test_one_row_per_decision_point():
+    table = build_feature_table(_build_corpus())
+    counts = table.groupby("generator_burst_id").size().to_dict()
+    assert counts == {"gen_burst_hv": 8, "gen_burst_ls": 5, "gen_burst_bh": 4}
+    # each row sees the session so far: n_prompts grows 1, 2, 3, ...
+    hv = table[table["generator_burst_id"] == "gen_burst_hv"].sort_values("decision_index")
+    assert hv["n_prompts"].tolist() == list(range(1, 9))
+
+
+def test_high_volume_burst_final_row_carries_the_whole_burst():
+    table = build_feature_table(_build_corpus())
     hv_rows = table[table["generator_burst_id"] == "gen_burst_hv"]
-    assert len(hv_rows) == 1
-    assert hv_rows.iloc[0]["n_prompts"] == 8
-    assert hv_rows.iloc[0]["label_attack"] == True
-    assert hv_rows.iloc[0]["deny_run_length"] == 7
+    final = hv_rows.sort_values("decision_index").iloc[-1]
+    assert final["n_prompts"] == 8
+    assert final["label_attack"] == True
+    assert final["deny_run_length"] == 7
+    assert final["capitulation_flag"] == True
 
 
-def test_low_and_slow_fragments_into_single_event_rows_all_labelled_attack():
-    df = _build_corpus()
-    table = build_feature_table(df)
-    ls_rows = table[table["generator_burst_id"] == "gen_burst_ls"]
-    assert len(ls_rows) == 5  # fully fragmented, one row per prompt
-    assert (ls_rows["n_prompts"] == 1).all()
+def test_low_and_slow_episode_is_one_session_with_valid_drift_slope():
+    """A1 verification: the response-behaviour features are defined for
+    low-and-slow, and deny_run_length reflects the whole episode."""
+    table = build_feature_table(_build_corpus())
+    ls_rows = table[table["generator_burst_id"] == "gen_burst_ls"].sort_values("decision_index")
+    assert (ls_rows["session_index"] == 0).all()
     assert (ls_rows["label_attack"] == True).all()
-    # each fragment individually has no burst-level signature to exploit
-    assert (ls_rows["latency_drift_slope_valid"] == False).all()
+    final = ls_rows.iloc[-1]
+    assert final["n_prompts"] == 5
+    assert final["deny_run_length"] == 4
+    assert final["capitulation_flag"] == True
+    assert final["latency_drift_slope_valid"] == True
+    # the first decision point is a lone prompt: slope undefined there only
+    assert ls_rows.iloc[0]["latency_drift_slope_valid"] == False
 
 
-def test_benign_high_activity_fragments_into_single_event_benign_rows():
-    df = _build_corpus()
-    table = build_feature_table(df)
-    bh_rows = table[table["generator_burst_id"] == "gen_burst_bh"]
-    assert len(bh_rows) == 4
-    assert (bh_rows["n_prompts"] == 1).all()
+def test_benign_high_activity_rows_are_benign_and_stationary():
+    table = build_feature_table(_build_corpus())
+    bh_rows = table[table["generator_burst_id"] == "gen_burst_bh"].sort_values("decision_index")
     assert (bh_rows["label_attack"] == False).all()
+    assert bh_rows.iloc[-1]["n_prompts"] == 4
+    assert bh_rows.iloc[-1]["deny_run_length"] == 0
+    assert bh_rows.iloc[-1]["latency_drift_slope"] == 0.0  # constant latency
+
+
+def test_gap_longer_than_session_threshold_starts_a_new_session():
+    from pulseguard_common.sessions import SESSION_GAP_THRESHOLD_SECONDS
+
+    gap = SESSION_GAP_THRESHOLD_SECONDS + 60
+    rows = _burst_rows("u9", "gen_two_sessions", False, None, [(0, "approve", 2.0), (gap, "approve", 2.0)])
+    table = build_feature_table(pd.DataFrame(rows))
+    assert table["session_index"].tolist() == [0, 1]
+    assert table["n_prompts"].tolist() == [1, 1]
 
 
 def test_to_model_matrix_has_no_missing_values():

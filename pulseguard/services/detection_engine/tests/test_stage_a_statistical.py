@@ -36,8 +36,15 @@ def test_high_deny_run_length_scores_high():
 
 
 def test_high_volume_prompt_count_scores_high():
-    vector = _base_vector(n_prompts=20)
+    vector = _base_vector(n_prompts=20, prompts_per_window=20)
     assert stage_a_flag(vector) is True
+
+
+def test_long_but_sparse_session_does_not_count_as_high_volume():
+    """A benign power user's 30-prompt day: many prompts per session, few
+    per 10-minute window."""
+    vector = _base_vector(n_prompts=30, prompts_per_window=2)
+    assert stage_a_score(vector) == 0.0
 
 
 def test_large_approval_latency_z_scores_high():

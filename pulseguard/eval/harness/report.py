@@ -63,8 +63,8 @@ def render_headline_comparison(results_dir: Path) -> str:
     for filename, label, n_key in [
         ("baseline_splunk.json", "Splunk (>9/10min)", "n_bursts_evaluated"),
         ("baseline_elastic.json", "Elastic (2 deny+success/10min)", "n_bursts_evaluated"),
-        ("stage_ab.json", "Stage A+B (fragment-level)", "n_bursts_evaluated"),
-        ("stage_c.json", "Stage C (sequence-level)", "n_episodes_evaluated"),
+        ("stage_ab.json", "Stage A+B", "n_bursts_evaluated"),
+        ("stage_c.json", "Stage C (GRU)", "n_episodes_evaluated"),
         ("full_fusion.json", "Full fusion (A+B+C)", "n_episodes_evaluated"),
     ]:
         path = results_dir / filename
@@ -72,6 +72,19 @@ def render_headline_comparison(results_dir: Path) -> str:
             continue
         result = load_result(path)
         lines.append(_detector_row(label, result["overall"], result.get(n_key, "n/a")))
+
+    fusion_path = results_dir / "full_fusion.json"
+    if fusion_path.exists():
+        fusion = load_result(fusion_path)
+        if "weights" in fusion:
+            w = fusion["weights"]
+            lines.append("")
+            lines.append(
+                f"Operating point (tuned on the validation split, loaded by the live scorer): "
+                f"weights A={w['a']:.2f} / B={w['b']:.2f} / C={w['c']:.2f}, threshold {fusion['threshold']:.2f}."
+            )
+        if "unit" in fusion:
+            lines.append(f"Unit: {fusion['unit']}.")
 
     return "\n".join(lines)
 
@@ -97,6 +110,18 @@ def render_ablation_section(results_dir: Path) -> str:
     lines.append(
         f"latency_drift_slope lift: **{result['latency_drift_slope_lift_percentage_points']:.1f} percentage points**."
     )
+    supplementary = result.get("supplementary")
+    if supplementary:
+        lines.append("")
+        lines.append(
+            "Supplementary deltas (full minus ablated variant; reported alongside the recall lift, never instead of it): "
+            f"response-behaviour F1 {supplementary['response_behaviour_f1_delta']:+.3f}, "
+            f"FPR {supplementary['response_behaviour_fpr_delta']:+.3f}, "
+            f"average precision {supplementary['response_behaviour_average_precision_delta']:+.3f}; "
+            f"latency_drift_slope F1 {supplementary['latency_drift_slope_f1_delta']:+.3f}, "
+            f"FPR {supplementary['latency_drift_slope_fpr_delta']:+.3f}, "
+            f"average precision {supplementary['latency_drift_slope_average_precision_delta']:+.3f}."
+        )
     if result["no_measurable_lift_latency_drift_slope"]:
         lines.append("")
         lines.append(
@@ -116,13 +141,15 @@ def render_adversarial_section(results_dir: Path) -> str:
     lines = ["## Adversarial evaluation (1-prompt/5-min pacing, mimicry attacker)", "",
               "| Detector | Mimicry recall | Slow-pacing recall |", "|---|---|---|"]
     profiles = ("mimicry_adversarial", "slow_pacing_adversarial")
-    for key, label in [("baselines", None), ("stage_ab", "Stage A+B"), ("stage_c", "Stage C")]:
+    for key, label in [("baselines", None), ("stage_ab", "Stage A+B"), ("stage_c", "Stage C"), ("full_fusion", "Full fusion")]:
         if key == "baselines":
             for detector_name, by_profile in result.get("baselines", {}).items():
                 mimicry = by_profile.get(profiles[0], {}).get("recall")
                 slow = by_profile.get(profiles[1], {}).get("recall")
                 lines.append(f"| {detector_name} | {_fmt(mimicry)} | {_fmt(slow)} |")
         else:
+            if key not in result:
+                continue
             by_profile = result.get(key, {})
             mimicry = by_profile.get(profiles[0], {}).get("recall")
             slow = by_profile.get(profiles[1], {}).get("recall")

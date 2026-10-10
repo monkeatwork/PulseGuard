@@ -6,7 +6,14 @@ in tests without touching other applications sharing the same Redis instance.
 
 from __future__ import annotations
 
-BURST_KEY_TTL_SECONDS = 15 * 60
+# TTL of a user's open-session buffer (`burst_current_key`). It must outlive
+# the session gap (sessions.SESSION_GAP_THRESHOLD_SECONDS, 60 min), which in
+# turn exceeds low-and-slow's 20-40 min pacing. The old 15-minute TTL expired
+# a low-and-slow user's buffer before their next prompt arrived, so every
+# such prompt was scored with no history (REMEDIATION_TASK.md A1). The
+# feature engine refreshes it on every event and closes idle sessions
+# itself; the TTL is only a backstop against abandoned keys.
+BURST_KEY_TTL_SECONDS = 2 * 60 * 60
 
 
 def baseline_latency_key(user_id: str) -> str:
@@ -18,6 +25,8 @@ def baseline_rate_key(user_id: str) -> str:
 
 
 def burst_current_key(user_id: str) -> str:
+    """The user's open-session event buffer (name kept from the burst era
+    so existing tooling/dashboards keep working)."""
     return f"pg:burst:{user_id}:current"
 
 

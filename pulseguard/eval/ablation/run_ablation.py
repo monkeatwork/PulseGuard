@@ -5,11 +5,13 @@ reported clearly is worth more than an inflated one (CLAUDE.md). The
 `no_measurable_lift_*` flags in the output are computed automatically and
 are NOT manually suppressible — see `NO_LIFT_NOISE_FLOOR_PERCENTAGE_POINTS`.
 
-Uses the same fragment-level feature table and Stage B training/evaluation
-machinery as Phase 4 (`feature_table.py`, `stage_b_xgboost.py`), varying
-only which feature columns are fed to the model — this isolates the
-feature set's own contribution rather than reflecting any change in model
-architecture or evaluation methodology.
+Uses the same session-level decision-point feature table, Stage B model
+and episode evaluation rule as the deployed system (`feature_table.py`,
+`stage_b_xgboost.py`, `episode_eval.py`), varying only which feature
+columns are fed to the model -- this isolates the feature set's own
+contribution rather than reflecting any change in model architecture or
+evaluation methodology. Excluded columns are removed from the matrix
+itself, not merely ignored (test_ablation_variants_are_isolated.py).
 """
 
 from __future__ import annotations
@@ -22,8 +24,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from eval.harness.metrics import breakdown_by_profile, compute_confusion
 from eval.harness.split import assign_split
+from services.detection_engine.app.episode_eval import average_precision as _average_precision
+from services.detection_engine.app.episode_eval import best_f1_threshold, episode_frame, evaluate, f1_of
 from services.detection_engine.app.feature_table import (
     FEATURE_COLUMNS,
     FREQUENCY_COLUMNS,
@@ -31,7 +34,6 @@ from services.detection_engine.app.feature_table import (
     to_model_matrix,
 )
 from services.detection_engine.app.stage_b_xgboost import train_stage_b
-from services.detection_engine.app.train_stage_b import best_f1_threshold
 
 logger = logging.getLogger("pulseguard.eval.ablation")
 
@@ -50,30 +52,31 @@ VARIANTS = {
 }
 
 
-def train_and_evaluate_variant(table: pd.DataFrame, columns: list[str]) -> dict:
+def train_and_evaluate_variant(table: pd.DataFrame, columns: list[str], seed: int = 42) -> dict:
     train = table[table["split"] == "train"]
     val = table[table["split"] == "val"]
-    test = table[table["split"] == "test"]
 
     X_train, y_train = to_model_matrix(train, columns), train["label_attack"]
     X_val, y_val = to_model_matrix(val, columns), val["label_attack"]
-    X_test, y_test = to_model_matrix(test, columns), test["label_attack"]
 
     model = train_stage_b(X_train, y_train, X_val, y_val)
-    val_proba = model.predict_proba(X_val)[:, 1]
-    threshold = best_f1_threshold(y_val.to_numpy(), val_proba)
-    test_proba = model.predict_proba(X_test)[:, 1]
-    preds = test_proba >= threshold
+    points = table[["generator_burst_id", "user_id", "label_attack", "attack_profile"]].copy()
+    points["score"] = model.predict_proba(to_model_matrix(table, columns))[:, 1]
+    episodes = episode_frame(points, seed, ["score"])
+    val_ep = episodes[episodes["split"] == "val"]
+    test_ep = episodes[episodes["split"] == "test"]
 
-    rows = [
-        {"attack_profile": p, "y_true": bool(t), "y_pred": bool(pr)}
-        for p, t, pr in zip(test["attack_profile"], y_test, preds)
-    ]
-    confusion = compute_confusion([r["y_true"] for r in rows], [r["y_pred"] for r in rows])
-    breakdown = breakdown_by_profile(rows)
+    threshold = best_f1_threshold(val_ep["label_attack"], val_ep["score"])
+    result = evaluate(test_ep, test_ep["score"] >= threshold)
     return {
-        "overall": confusion.as_dict(),
-        "by_profile": breakdown,
+        "overall": result["overall"],
+        "f1": f1_of(test_ep["label_attack"], test_ep["score"] >= threshold),
+        # threshold-free: can still move when recall saturates at the chosen threshold
+        "average_precision": _average_precision(
+            test_ep["label_attack"].to_numpy(dtype=bool), test_ep["score"].to_numpy()
+        ),
+        "by_profile": result["by_profile"],
+        "n_episodes_evaluated": result["n_episodes_evaluated"],
         "n_features": len(columns),
         "features": columns,
         "threshold": float(threshold),
@@ -113,7 +116,7 @@ def run(events_path: Path, seed: int, results_dir: Path) -> dict:
     results = {}
     for name, columns in VARIANTS.items():
         logger.info("Training ablation variant: %s (%d features)", name, len(columns))
-        results[name] = train_and_evaluate_variant(table, columns)
+        results[name] = train_and_evaluate_variant(table, columns, seed)
 
     freq_recall = results["frequency_only"]["overall"]["recall"] or 0.0
     full_recall = results["frequency_plus_response_behaviour"]["overall"]["recall"] or 0.0
@@ -123,11 +126,25 @@ def run(events_path: Path, seed: int, results_dir: Path) -> dict:
     response_behaviour_lift_pp = lift_flags["response_behaviour_lift_percentage_points"]
     slope_lift_pp = lift_flags["latency_drift_slope_lift_percentage_points"]
 
+    full, minus = results["frequency_plus_response_behaviour"], results["response_behaviour_minus_latency_drift_slope"]
+    freq = results["frequency_only"]
     summary = {
         "seed": seed,
         "noise_floor_percentage_points": NO_LIFT_NOISE_FLOOR_PERCENTAGE_POINTS,
         "variants": results,
         **lift_flags,
+        # Supplementary deltas, reported alongside (never instead of) the
+        # recall-based lift and its automatic banner: recall can saturate at
+        # the operating threshold and hide a difference that shows up in
+        # precision/FPR or in the threshold-free average precision.
+        "supplementary": {
+            "response_behaviour_f1_delta": full["f1"] - freq["f1"],
+            "response_behaviour_fpr_delta": (full["overall"]["fpr"] or 0.0) - (freq["overall"]["fpr"] or 0.0),
+            "response_behaviour_average_precision_delta": full["average_precision"] - freq["average_precision"],
+            "latency_drift_slope_f1_delta": full["f1"] - minus["f1"],
+            "latency_drift_slope_fpr_delta": (full["overall"]["fpr"] or 0.0) - (minus["overall"]["fpr"] or 0.0),
+            "latency_drift_slope_average_precision_delta": full["average_precision"] - minus["average_precision"],
+        },
     }
 
     if summary["no_measurable_lift_response_behaviour"]:

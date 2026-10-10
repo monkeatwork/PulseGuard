@@ -1,33 +1,43 @@
-"""Builds a labelled per-(gap-based-)burst feature table from a generator
-`events.parquet` DataFrame, using the SAME feature-engine pure functions the
-live stream would use (`windows.py`, `enrichment.py`) — so what Stage A/B
-train and evaluate against is exactly what production would compute, not a
-separate offline reimplementation.
+"""Builds the labelled feature table Stage A/B train and evaluate on, using
+the SAME pure functions the live feature engine calls (`sessions.py`,
+`enrichment.py`) -- so what the models see offline is exactly what
+production computes, not a separate reimplementation.
 
-Evaluation/training unit is the feature engine's own gap-based burst, NOT
-the generator's ground-truth `burst_id` — see DECISIONS.md, "Correction:
-Phase 4's planned low-and-slow recall target was wrong", for why a single
-`low_and_slow` generator burst decomposes into many single-event gap-based
-bursts, each labelled `attack` via its parent `burst_id` but individually
-lacking any burst-level signature.
+Unit: one row per DECISION POINT of a session (DECISIONS.md 2026-10-11,
+"Session-level scoring"). For every generator episode (`burst_id`), the
+user's events are split into sessions (`sessions.SESSION_GAP_THRESHOLD_SECONDS`)
+and, at every `mfa_decision`, the session-so-far is featurised -- precisely
+what `streaming_app.py` emits live on each decision event. An episode is
+predicted positive if ANY of its decision points crosses the threshold,
+which is the live alerting rule (the first crossing raises the alert).
+
+This replaces the old per-5-minute-fragment unit, under which a
+low-and-slow episode decomposed into isolated single-prompt fragments with
+every response-behaviour feature undefined (REMEDIATION_TASK.md A1/A2).
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Iterator, Optional
+
 import pandas as pd
 
 from pulseguard_common.baseline_store import LatencyBaseline
-from pulseguard_common.enrichment import CohortBaselineProvider, enrich_burst
-from pulseguard_common.windows import pair_prompts_and_decisions, segment_into_bursts
+from pulseguard_common.enrichment import CohortBaselineProvider, commit_baselines, compute_features
+from pulseguard_common.sessions import (
+    decision_point_prefixes,
+    segment_events_into_sessions,
+    session_context,
+    session_pairs,
+)
 
 
 class InMemoryBaselineStore:
     """Batch-training-time stand-in for RedisBaselineStore: same interface,
-    plain-dict backed, no Redis dependency. Each user in the benchmark
-    corpus contributes at most one generator `burst_id`, so there is no
-    cross-user state dependency and no global chronological ordering is
-    required across users — only within a single user's own sub-bursts,
-    which `build_feature_table` already processes in time order."""
+    plain-dict backed, no Redis dependency. Baselines are advanced once per
+    closed session (commit_baselines), exactly as the live feature engine
+    does when a session closes."""
 
     def __init__(self):
         self._latency: dict[str, LatencyBaseline] = {}
@@ -56,45 +66,67 @@ class InMemoryBaselineStore:
         self._devices.setdefault(user_id, set()).add(device_id)
 
 
-def build_feature_table(events_df: pd.DataFrame) -> pd.DataFrame:
-    labelled = events_df[events_df["burst_id"].notna()].copy()
+@dataclass
+class DecisionPoint:
+    episode_id: str  # the generator's ground-truth burst_id (evaluation unit)
+    user_id: str
+    label_attack: bool
+    attack_profile: Optional[str]
+    session_index: int
+    decision_index: int
+    prefix_events: list[dict]
+
+
+def _normalise_profile(raw) -> Optional[str]:
+    # A parquet round-trip of an object column mixing strings and None
+    # re-reads None as float NaN (DECISIONS.md, "Bug fix: attack_profile NaN
+    # vs None"). Normalise at the source.
+    return None if raw is None or (isinstance(raw, float) and pd.isna(raw)) else raw
+
+
+def iter_decision_points(
+    events_df: pd.DataFrame, store: Optional[InMemoryBaselineStore] = None
+) -> Iterator[tuple[DecisionPoint, Optional[object]]]:
+    """Yields every decision point of every labelled episode, in a fixed
+    order (episode id, then time). When `store` is given, also yields the
+    feature vector computed against it, committing baselines as each session
+    closes. Shared by feature_table and sequence_dataset so their rows line
+    up one-to-one."""
+    labelled = events_df[events_df["burst_id"].notna()]
     if labelled.empty:
-        return pd.DataFrame()
-
-    store = InMemoryBaselineStore()
+        return
     cohort = CohortBaselineProvider()
-    rows = []
-
-    for generator_burst_id, group in labelled.groupby("burst_id"):
+    for episode, group in labelled.groupby("burst_id", sort=True):
         group = group.sort_values("ts")
-        user_id = group.iloc[0]["user_id"]
-        label = bool(group.iloc[0]["label_attack"])
-        # A parquet round-trip of an object column mixing strings and None
-        # re-reads the None as float NaN, not Python None (see DECISIONS.md,
-        # "Bug fix: attack_profile NaN vs None"). Normalize at the source so
-        # every downstream consumer of this table gets a real None.
-        raw_profile = group.iloc[0]["attack_profile"]
-        profile = None if pd.isna(raw_profile) else raw_profile
+        first = group.iloc[0]
+        user_id = str(first["user_id"])
+        label = bool(first["label_attack"])
+        profile = _normalise_profile(first["attack_profile"])
         events = group.to_dict("records")
-        pairs = pair_prompts_and_decisions(events)
-        gap_bursts = segment_into_bursts(pairs)
+        for s_idx, session in enumerate(segment_events_into_sessions(events)):
+            for d_idx, prefix in decision_point_prefixes(session):
+                point = DecisionPoint(str(episode), user_id, label, profile, s_idx, d_idx, prefix)
+                vector = None
+                if store is not None:
+                    country, device_id = session_context(prefix)
+                    vector = compute_features(user_id, session_pairs(prefix), country, device_id, store, cohort)
+                yield point, vector
+            if store is not None:
+                country, device_id = session_context(session)
+                commit_baselines(user_id, session_pairs(session), country, device_id, store)
 
-        for gap_burst in gap_bursts:
-            last_pair = gap_burst[-1]
-            match_ts = last_pair.decision_ts or last_pair.prompt_ts
-            context_rows = group[group["ts"] == match_ts]
-            country = context_rows.iloc[0]["geo_country"] if not context_rows.empty else None
-            device_id = context_rows.iloc[0]["device_id"] if not context_rows.empty else "unknown"
 
-            vector = enrich_burst(user_id, gap_burst, country, device_id, store, cohort)
-            row = vector.as_dict()
-            row["label_attack"] = label
-            row["attack_profile"] = profile
-            row["generator_burst_id"] = generator_burst_id
-            rows.append(row)
-    # note: row["user_id"] is already set by vector.as_dict() (BurstFeatureVector
-    # carries user_id) -- not duplicated here.
-
+def build_feature_table(events_df: pd.DataFrame) -> pd.DataFrame:
+    store = InMemoryBaselineStore()
+    rows = []
+    for point, vector in iter_decision_points(events_df, store):
+        row = vector.as_dict()  # carries user_id
+        row["label_attack"] = point.label_attack
+        row["attack_profile"] = point.attack_profile
+        row["generator_burst_id"] = point.episode_id
+        row["session_index"] = point.session_index
+        row["decision_index"] = point.decision_index
+        rows.append(row)
     return pd.DataFrame(rows)
 
 

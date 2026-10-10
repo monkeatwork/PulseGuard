@@ -76,7 +76,7 @@ class BurstFeatureVector:
         return asdict(self)
 
 
-def enrich_burst(
+def compute_features(
     user_id: str,
     pairs: list[PromptDecisionPair],
     country: Optional[str],
@@ -85,9 +85,10 @@ def enrich_burst(
     cohort_provider: CohortBaselineProvider,
     rolling_median_skew_seconds: float = 0.0,
 ) -> BurstFeatureVector:
-    """Computes every feature for one finalized burst and updates the
-    user's baselines with its approval (if any). Must be called only after
-    windows.is_burst_finalizable confirms the grace window has elapsed."""
+    """Computes every feature for one burst or session prefix WITHOUT
+    touching baseline state (reads only). Session-level scoring calls this
+    once per decision point, so it must be side-effect free; baselines are
+    advanced exactly once per closed session by `commit_baselines`."""
     prompt_timestamps = [p.prompt_ts for p in pairs]
 
     latency_baseline = store.load_latency(user_id)
@@ -112,7 +113,7 @@ def enrich_burst(
     is_country_novel = bool(country) and not store.is_country_known(user_id, country)
     is_device_novel = not store.is_device_known(user_id, device_id)
 
-    vector = BurstFeatureVector(
+    return BurstFeatureVector(
         user_id=user_id,
         n_prompts=len(pairs),
         prompts_per_window=freq.prompts_per_window(prompt_timestamps, prompt_timestamps[-1]),
@@ -135,12 +136,43 @@ def enrich_burst(
         baseline_is_cold_start=cold_start,
     )
 
-    # Update baselines AFTER computing this burst's features, so the current
-    # burst is scored against its own history, not itself.
-    if approve_latency is not None:
-        store.update_latency(user_id, float(approve_latency))
+
+def commit_baselines(
+    user_id: str,
+    pairs: list[PromptDecisionPair],
+    country: Optional[str],
+    device_id: str,
+    store: BaselineStoreProtocol,
+    all_approvals: bool = True,
+) -> None:
+    """Advances the user's baselines with a finished burst/session: approval
+    latencies feed the EWMA latency baseline, and the session's country and
+    device become "known". Called AFTER the unit has been scored, so a
+    session is always scored against its own history, never itself."""
+    approvals = [p.decision_latency_ms for p in pairs if p.decision == "approve" and p.decision_latency_ms is not None]
+    if not all_approvals:
+        approvals = approvals[:1]
+    for latency in approvals:
+        store.update_latency(user_id, float(latency))
     if country:
         store.record_country(user_id, country)
     store.record_device(user_id, device_id)
 
+
+def enrich_burst(
+    user_id: str,
+    pairs: list[PromptDecisionPair],
+    country: Optional[str],
+    device_id: str,
+    store: BaselineStoreProtocol,
+    cohort_provider: CohortBaselineProvider,
+    rolling_median_skew_seconds: float = 0.0,
+) -> BurstFeatureVector:
+    """compute_features + commit_baselines in one call (first approval only,
+    the original per-burst semantics). Kept for single-shot callers and the
+    existing unit tests; session scoring uses the two halves separately."""
+    vector = compute_features(
+        user_id, pairs, country, device_id, store, cohort_provider, rolling_median_skew_seconds
+    )
+    commit_baselines(user_id, pairs, country, device_id, store, all_approvals=False)
     return vector

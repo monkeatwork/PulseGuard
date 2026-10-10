@@ -1,81 +1,68 @@
-"""L3 Faust stream app: consumes `pulseguard.events.raw`, buffers per-user
-prompt/decision events, finalizes bursts once the out-of-order grace window
-has elapsed, computes each burst's feature vector against Redis-backed
-baselines, and produces the result to `pulseguard.events.enriched`.
+"""L3 Faust stream app: consumes `pulseguard.events.raw`, keeps each user's
+open MFA session in Redis, and on every `mfa_decision` produces the
+session-so-far's feature vector (plus the raw sequence Stage C needs) to
+`pulseguard.events.enriched`.
 
-This module is thin Kafka/Redis wiring only — every actual computation is
-delegated to the pure functions in windows.py/enrichment.py, which carry
-their own unit tests. See DECISIONS.md, "Phase 3 streaming integration test
-scope", for why this module's live Kafka-consumption behavior is exercised
-through `docker compose up` rather than a Testcontainers+Faust-worker test:
-Faust's own consumer-group/rebalancing correctness is the framework's
-concern, not something this project needs to re-prove.
+This module is thin Kafka/Redis wiring only. The per-event logic, including
+the load-bearing persist -> send -> trim ordering, lives in
+session_processor.py; feature maths lives in pulseguard_common.
 
-Known simplification: when a timer tick finalizes more than one user's
-burst at once, each finalized burst uses the *last* raw event in that
-user's buffer for geo/device context, rather than the context matching
-that specific burst. In practice a burst's grace window (5s) is far
-shorter than the timer interval (1s) times the number of concurrent
-bursts a single user can have, so this only matters for the rare case of
-multiple ready bursts for the same user in the same tick — flagged here
-rather than hidden.
+Scoring is event-driven, not timer-driven: a decision is featurised the
+moment it arrives, which is what in-band mitigation needs (the old design
+waited for a burst to go quiet before scoring it). The only timer left
+closes sessions for users who have been silent longer than the session gap,
+committing them to the baselines.
+
+The buffer lives in Redis, not a Faust Table: Faust forbids writing to a
+Table outside stream iteration, and the idle-close timer must write
+(DECISIONS.md, 2026-09-21). With no Table there is also no co-partitioning
+constraint, so `pulseguard.events.raw` can have several partitions keyed by
+user_id (REMEDIATION_TASK.md C4).
 """
 
 from __future__ import annotations
 
-import json
 import os
-from datetime import datetime
+import time
 
 import faust
 import redis as redis_lib
 
+from pulseguard_common.baseline_store import RedisBaselineStore
 from pulseguard_common.event_schema import PulseGuardEvent
 from pulseguard_common.redis_keys import BURST_KEY_TTL_SECONDS, burst_current_key
-from pulseguard_common.time_utils import utcnow
-from pulseguard_common.baseline_store import RedisBaselineStore
-from pulseguard_common.enrichment import CohortBaselineProvider, enrich_burst
-from pulseguard_common.windows import (
-    is_burst_finalizable,
-    pair_prompts_and_decisions,
-    segment_into_bursts,
+from pulseguard_common.sessions import SESSION_GAP_THRESHOLD_SECONDS
+from services.feature_engine.app.session_processor import (
+    close_idle_user,
+    decode_entry,
+    encode_entry,
+    entry_from_event,
+    handle_event,
 )
 
-KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "redpanda:9092")
+KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
-FINALIZE_TIMER_INTERVAL_SECONDS = 1.0
+IDLE_CLOSE_TIMER_INTERVAL_SECONDS = 30.0
 
-# Set of user_ids currently holding a non-empty pending buffer, so the
-# finalize timer knows who to check without scanning the whole keyspace.
-PENDING_USERS_KEY = "pg:burst:pending_users"
+# Sorted set: user_id -> wall-clock time of that user's last event arrival.
+# Processing time, deliberately: replayed historical events carry old IdP
+# timestamps, and closing their sessions by event time would close them the
+# instant they arrive.
+ACTIVE_USERS_KEY = "pg:session:active_users"
 
 app = faust.App(
     "pulseguard-feature-engine",
     broker=f"kafka://{KAFKA_BOOTSTRAP_SERVERS}",
     value_serializer="raw",
+    topic_allow_declare=False,  # topics are created up front by the kafka-init job
 )
 
 raw_topic = app.topic("pulseguard.events.raw")
 enriched_topic = app.topic("pulseguard.events.enriched")
 
-# The per-user buffer of events awaiting burst finalization lives in REDIS,
-# not a Faust Table. This matters, and was learned the hard way: Faust
-# forbids writing to a Table outside stream iteration ("Cannot modify table
-# key from outside of stream iteration"), because a table write must be
-# tied to the source partition/offset being processed for changelog
-# correctness. Our finalization is inherently time-driven (a burst is ready
-# once its grace window elapses, whether or not a new event arrives), so it
-# runs on a timer -- which a Faust Table structurally cannot support.
-#
-# Redis was in fact the original Phase 0 design for this buffer
-# (`pg:burst:{user_id}:current`, TTL 15min -- see redis_keys.py); using a
-# Faust Table was an undocumented drift from that decision, and it is what
-# broke. As a bonus this removes the table's changelog topic entirely,
-# along with Faust's co-partitioning constraint that caused the earlier
-# PartitionsMismatch crash-loop.
-_baseline_store: RedisBaselineStore | None = None
 _redis_client: redis_lib.Redis | None = None
+_store: RedisBaselineStore | None = None
 
 
 def get_redis() -> redis_lib.Redis:
@@ -85,163 +72,69 @@ def get_redis() -> redis_lib.Redis:
     return _redis_client
 
 
-def get_baseline_store() -> RedisBaselineStore:
-    global _baseline_store
-    if _baseline_store is None:
-        _baseline_store = RedisBaselineStore(get_redis())
-    return _baseline_store
+def get_store() -> RedisBaselineStore:
+    global _store
+    if _store is None:
+        _store = RedisBaselineStore(get_redis())
+    return _store
 
 
-def _encode_buffer_entry(entry: dict) -> str:
-    """datetimes aren't JSON-serializable; store them as ISO strings."""
-    encoded = dict(entry)
-    encoded["ts"] = entry["ts"].isoformat()
-    encoded["ingest_ts"] = entry["ingest_ts"].isoformat() if entry.get("ingest_ts") else None
-    return json.dumps(encoded)
+class RedisBuffer:
+    """BufferIO over a Redis list per user."""
+
+    def __init__(self, client: redis_lib.Redis):
+        self._r = client
+
+    def append(self, user_id: str, entry: dict) -> None:
+        key = burst_current_key(user_id)
+        pipe = self._r.pipeline()
+        pipe.rpush(key, encode_entry(entry))
+        pipe.expire(key, BURST_KEY_TTL_SECONDS)
+        pipe.zadd(ACTIVE_USERS_KEY, {user_id: time.time()})
+        pipe.execute()
+
+    def load(self, user_id: str) -> list[dict]:
+        return [decode_entry(raw) for raw in self._r.lrange(burst_current_key(user_id), 0, -1)]
+
+    def replace(self, user_id: str, entries: list[dict]) -> None:
+        key = burst_current_key(user_id)
+        pipe = self._r.pipeline()
+        pipe.delete(key)
+        if entries:
+            pipe.rpush(key, *[encode_entry(e) for e in entries])
+            pipe.expire(key, BURST_KEY_TTL_SECONDS)
+        else:
+            pipe.zrem(ACTIVE_USERS_KEY, user_id)
+        pipe.execute()
 
 
-def _decode_buffer_entry(raw: bytes | str) -> dict:
-    decoded = json.loads(raw)
-    decoded["ts"] = datetime.fromisoformat(decoded["ts"])
-    decoded["ingest_ts"] = (
-        datetime.fromisoformat(decoded["ingest_ts"]) if decoded.get("ingest_ts") else None
-    )
-    return decoded
+def encode_message(message: dict) -> bytes:
+    """`value_serializer="raw"` hands values straight to the producer, so
+    serialise explicitly. `default=str` keeps a stray datetime/numpy scalar
+    from crashing the agent."""
+    import json
 
-
-def _encode_enriched_message(message: dict) -> bytes:
-    """The app is configured with `value_serializer="raw"`, so Faust hands
-    the value straight to aiokafka without serializing it -- producing a
-    dict raises "a bytes-like object is required, not 'dict'". Raw is the
-    right choice for the consumer side (the raw topic carries pydantic's
-    own JSON, and live_scorer.py does its own `json.loads`), so the
-    producer serializes explicitly here instead.
-
-    `default=str` is a deliberate safety net: the feature vector is plain
-    floats/bools today, but any datetime or numpy scalar that later leaks
-    into it would otherwise crash the finalize timer -- and a crashed timer
-    silently stops every burst in the system from ever being scored.
-    """
     return json.dumps(message, default=str).encode("utf-8")
 
 
-def event_to_raw_dict(event: PulseGuardEvent) -> dict:
-    return {
-        "event_type": event.event_type.value,
-        "ts": event.ts,
-        "decision": event.decision.value if event.decision else None,
-        "decision_latency_ms": event.decision_latency_ms,
-        "ingest_ts": event.ingest_ts,
-        "geo_country": event.geo.country if event.geo else None,
-        "device_id": event.device_id,
-        "session_id": event.session_id,
-    }
+async def _send(user_id: str, message: dict) -> None:
+    await enriched_topic.send(key=user_id.encode("utf-8"), value=encode_message(message))
 
 
 @app.agent(raw_topic)
 async def process_events(events):
-    redis_client = get_redis()
+    buffer = RedisBuffer(get_redis())
+    store = get_store()
     async for raw_value in events:
         event = PulseGuardEvent.model_validate_json(raw_value)
-        key = burst_current_key(event.user_id)
-        pipe = redis_client.pipeline()
-        pipe.rpush(key, _encode_buffer_entry(event_to_raw_dict(event)))
-        pipe.expire(key, BURST_KEY_TTL_SECONDS)
-        pipe.sadd(PENDING_USERS_KEY, event.user_id)
-        pipe.execute()
+        await handle_event(event.user_id, entry_from_event(event), buffer, store, _send)
 
 
-def _serialize_sequence(raw_events: list[dict]) -> list[dict]:
-    """The raw per-event sequence Stage C needs (sequence_dataset.py), sent
-    alongside the aggregate feature vector Stage A/B need -- so a single
-    enriched message carries everything the live detection worker requires
-    without a second Kafka round trip."""
-    return [
-        {
-            "event_type": e["event_type"],
-            "ts": e["ts"].isoformat() if hasattr(e["ts"], "isoformat") else e["ts"],
-            "decision": e.get("decision"),
-            "decision_latency_ms": e.get("decision_latency_ms"),
-        }
-        for e in sorted(raw_events, key=lambda e: e["ts"])
-    ]
-
-
-def finalize_ready_bursts_for_user(
-    user_id: str, buffer: list[dict], now, store: RedisBaselineStore
-) -> tuple[list[dict], list[dict]]:
-    """Pure-ish helper (only the store is stateful) so the finalization
-    logic can be unit-tested without a running Faust app. Returns
-    (enriched_messages, remaining_buffer). Each enriched message carries
-    the aggregate feature vector (Stage A/B input), the raw event sequence
-    (Stage C input), and the session_id an Alert row should be linked to.
-    """
-    if not buffer:
-        return [], []
-
-    pairs = pair_prompts_and_decisions(buffer)
-    bursts = segment_into_bursts(pairs)
-    last_event = buffer[-1]
-
-    enriched_messages = []
-    remaining_buffer = []
-    for burst in bursts:
-        burst_ts = {p.prompt_ts for p in burst} | {p.decision_ts for p in burst if p.decision_ts}
-        burst_raw_events = [e for e in buffer if e["ts"] in burst_ts]
-
-        if is_burst_finalizable(burst, now):
-            vector = enrich_burst(
-                user_id,
-                burst,
-                last_event.get("geo_country"),
-                last_event.get("device_id", "unknown"),
-                store,
-                CohortBaselineProvider(),
-            )
-            session_id = next(
-                (e.get("session_id") for e in reversed(burst_raw_events) if e.get("session_id")),
-                None,
-            )
-            enriched_messages.append(
-                {
-                    "feature_vector": vector.as_dict(),
-                    "session_id": session_id,
-                    "sequence": _serialize_sequence(burst_raw_events),
-                }
-            )
-        else:
-            remaining_buffer.extend(burst_raw_events)
-
-    return enriched_messages, remaining_buffer
-
-
-@app.timer(interval=FINALIZE_TIMER_INTERVAL_SECONDS)
-async def finalize_ready_bursts():
-    """Time-driven, not event-driven: a burst becomes ready once its grace
-    window elapses, whether or not another event ever arrives for that
-    user. This is why the buffer must live in Redis rather than a Faust
-    Table -- see the module-level comment."""
-    redis_client = get_redis()
-    store = get_baseline_store()
-    now = utcnow()
-
-    for raw_user_id in list(redis_client.smembers(PENDING_USERS_KEY)):
-        user_id = raw_user_id.decode() if isinstance(raw_user_id, bytes) else raw_user_id
-        key = burst_current_key(user_id)
-        buffer = [_decode_buffer_entry(raw) for raw in redis_client.lrange(key, 0, -1)]
-        if not buffer:
-            redis_client.srem(PENDING_USERS_KEY, user_id)
-            continue
-
-        messages, remaining = finalize_ready_bursts_for_user(user_id, buffer, now, store)
-        for message in messages:
-            await enriched_topic.send(value=_encode_enriched_message(message))
-
-        pipe = redis_client.pipeline()
-        pipe.delete(key)
-        if remaining:
-            pipe.rpush(key, *[_encode_buffer_entry(e) for e in remaining])
-            pipe.expire(key, BURST_KEY_TTL_SECONDS)
-        else:
-            pipe.srem(PENDING_USERS_KEY, user_id)
-        pipe.execute()
+@app.timer(interval=IDLE_CLOSE_TIMER_INTERVAL_SECONDS)
+async def close_idle_sessions():
+    client = get_redis()
+    cutoff = time.time() - SESSION_GAP_THRESHOLD_SECONDS
+    buffer = RedisBuffer(client)
+    for raw in client.zrangebyscore(ACTIVE_USERS_KEY, 0, cutoff):
+        user_id = raw.decode() if isinstance(raw, bytes) else raw
+        close_idle_user(user_id, buffer, get_store())

@@ -1,9 +1,7 @@
-"""Trains Stage C (GRU) on per-user event sequences and evaluates on the
-frozen test split at user-episode granularity — the same unit Phase 2's
-industry baselines used, so the comparison is apples-to-apples (unlike
-Stage A/B's fragment-level training/evaluation unit; see
-sequence_dataset.py's module docstring for why the two stages deliberately
-use different granularities).
+"""Trains Stage C (GRU) on session-prefix event sequences (one per decision
+point, sequence_dataset.py) and evaluates on the frozen test split at
+episode granularity -- the same unit as the industry baselines and Stage
+A/B, and the same rule the live path alerts on (episode_eval.py).
 
 Usage:
     python -m services.detection_engine.app.train_stage_c \
@@ -24,11 +22,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from eval.harness.metrics import breakdown_by_profile, compute_confusion
 from eval.harness.split import assign_split
+from services.detection_engine.app.episode_eval import best_f1_threshold, episode_frame, evaluate
 from services.detection_engine.app.sequence_dataset import build_sequence_dataset
 from services.detection_engine.app.stage_c_gru import StageCGRU
-from services.detection_engine.app.train_stage_b import best_f1_threshold
 
 logger = logging.getLogger("pulseguard.detection_engine.train_stage_c")
 
@@ -81,49 +78,45 @@ def train_stage_c(
     return model
 
 
-def predict_proba(model: StageCGRU, X: np.ndarray, lengths: np.ndarray) -> np.ndarray:
+def predict_proba(model: StageCGRU, X: np.ndarray, lengths: np.ndarray, batch_size: int = 4096) -> np.ndarray:
     model.eval()
-    X_t = torch.tensor(X, dtype=torch.float32)
-    len_t = torch.tensor(lengths, dtype=torch.long)
+    out = []
     with torch.no_grad():
-        logits = model(X_t, len_t)
-    return torch.sigmoid(logits).numpy()
+        for i in range(0, len(X), batch_size):
+            X_t = torch.tensor(X[i : i + batch_size], dtype=torch.float32)
+            len_t = torch.tensor(lengths[i : i + batch_size], dtype=torch.long)
+            out.append(torch.sigmoid(model(X_t, len_t)).numpy())
+    return np.concatenate(out) if out else np.zeros((0,), dtype=np.float32)
 
 
 def run(events_path: Path, seed: int, model_out: Path, results_dir: Path) -> dict:
+    """Trains on TRAIN-split decision-point sequences, picks the threshold
+    on VAL-split episodes, reports on TEST-split episodes."""
+    torch.manual_seed(seed)
     events_df = pd.read_parquet(events_path)
     X, lengths, y, user_ids, profiles, burst_ids = build_sequence_dataset(events_df)
     splits = np.array([assign_split(seed, u) for u in user_ids])
-
-    train_mask, val_mask, test_mask = splits == "train", splits == "val", splits == "test"
+    train_mask, val_mask = splits == "train", splits == "val"
 
     model = train_stage_c(
         X[train_mask], lengths[train_mask], y[train_mask],
         X[val_mask], lengths[val_mask], y[val_mask],
     )
 
-    val_proba = predict_proba(model, X[val_mask], lengths[val_mask])
-    threshold = best_f1_threshold(y[val_mask], val_proba)
+    points = pd.DataFrame({
+        "generator_burst_id": burst_ids,
+        "user_id": user_ids,
+        "label_attack": y,
+        "attack_profile": profiles,
+        "stage_c_proba": predict_proba(model, X, lengths),
+    })
+    episodes = episode_frame(points, seed, ["stage_c_proba"])
+    val_ep = episodes[episodes["split"] == "val"]
+    test_ep = episodes[episodes["split"] == "test"]
 
-    test_proba = predict_proba(model, X[test_mask], lengths[test_mask])
-    test_preds = test_proba >= threshold
-    test_profiles = np.array(profiles, dtype=object)[test_mask]
-    test_labels = y[test_mask]
-
-    rows = [
-        {"attack_profile": p, "y_true": bool(t), "y_pred": bool(pred)}
-        for p, t, pred in zip(test_profiles, test_labels, test_preds)
-    ]
-    confusion = compute_confusion([r["y_true"] for r in rows], [r["y_pred"] for r in rows])
-    breakdown = breakdown_by_profile(rows)
-
-    results = {
-        "split": "test",
-        "n_episodes_evaluated": len(rows),
-        "threshold": float(threshold),
-        "overall": confusion.as_dict(),
-        "by_profile": breakdown,
-    }
+    threshold = best_f1_threshold(val_ep["label_attack"], val_ep["stage_c_proba"])
+    results = evaluate(test_ep, test_ep["stage_c_proba"] >= threshold)
+    results["threshold"] = float(threshold)
 
     model_out.parent.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), model_out)
@@ -131,7 +124,7 @@ def run(events_path: Path, seed: int, model_out: Path, results_dir: Path) -> dic
     results_dir.mkdir(parents=True, exist_ok=True)
     (results_dir / "stage_c.json").write_text(json.dumps(results, indent=2, default=str))
     logger.info(
-        "Stage C: precision=%.3f recall=%.3f fpr=%.3f (n=%d)",
+        "Stage C: precision=%.3f recall=%.3f fpr=%.3f (n=%d episodes)",
         results["overall"]["precision"] or 0.0,
         results["overall"]["recall"] or 0.0,
         results["overall"]["fpr"] or 0.0,

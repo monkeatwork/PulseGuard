@@ -1,27 +1,29 @@
-"""Tests the finalization logic streaming_app.py's timer calls, against a
-real Redis backend (Testcontainers) but without a running Faust worker or
-Kafka broker — see DECISIONS.md, "Phase 3 streaming integration test
-scope", for why full Kafka consumption is exercised via `docker compose up`
-rather than here.
+"""Tests the live feature engine's per-event path (session_processor.handle_event)
+against a REAL Redis buffer (Testcontainers + streaming_app.RedisBuffer), but
+without a Faust worker or Kafka broker -- see DECISIONS.md, "Phase 3
+streaming integration test scope". Kafka consumption itself is exercised by
+the end-to-end run (`./run.sh` plus a replay).
 
-Includes a throughput check standing in for the Phase 3 gate's "p99 < 200ms
-enrichment latency on a 10k-event burst": since we cannot measure live
-per-event Kafka pipeline latency without a running broker+worker in a unit
-test, this measures the CPU-bound part (pairing/segmentation/enrichment)
-directly, which is where that budget is actually spent.
+Includes the per-decision scoring-latency check that stands in for CLAUDE.md's
+"single-digit-millisecond scoring" budget on the feature side: session-level
+aggregation recomputes the session-so-far on every decision, so this is
+where the extra cost of REMEDIATION_TASK.md A2 would show up.
 """
 
 from __future__ import annotations
 
+import asyncio
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 
-import redis as redis_lib
 import pytest
+import redis as redis_lib
 from testcontainers.community.redis import RedisContainer
 
 from pulseguard_common.baseline_store import RedisBaselineStore
-from services.feature_engine.app.streaming_app import finalize_ready_bursts_for_user
+from services.feature_engine.app.session_processor import handle_event
+from services.feature_engine.app.streaming_app import RedisBuffer
 
 T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
@@ -42,81 +44,103 @@ def _flush_between_tests(redis_client):
     yield
 
 
-def _make_buffer(n_pairs: int, gap_seconds: float = 1.0, session_id: str = "session-abc") -> list[dict]:
-    buffer = []
-    ts = T0
-    for i in range(n_pairs):
-        prompt_ts = ts
-        decision_ts = prompt_ts + timedelta(milliseconds=500)
-        buffer.append({
-            "event_type": "mfa_prompt", "ts": prompt_ts, "geo_country": "US", "device_id": "d1",
-            "session_id": session_id,
-        })
-        buffer.append(
-            {
-                "event_type": "mfa_decision", "ts": decision_ts,
-                "decision": "deny" if i < n_pairs - 1 else "approve",
-                "decision_latency_ms": 5000 - i * 5 if i < n_pairs - 1 else 500,
-                "ingest_ts": decision_ts, "geo_country": "US", "device_id": "d1",
-                "session_id": session_id,
-            }
-        )
-        ts = decision_ts + timedelta(seconds=gap_seconds)
-    return buffer
+def _pair(user, prompt_ts, decision, latency_ms, session_id="sess-1"):
+    decision_ts = prompt_ts + timedelta(milliseconds=latency_ms)
+    common = dict(geo_country="US", device_id="victim-phone", src_ip="10.0.0.5", user_agent="UA", session_id=session_id)
+    return [
+        dict(event_id=str(uuid.uuid4()), event_type="mfa_prompt", ts=prompt_ts, decision=None,
+             decision_latency_ms=None, ingest_ts=prompt_ts, **common),
+        dict(event_id=str(uuid.uuid4()), event_type="mfa_decision", ts=decision_ts, decision=decision,
+             decision_latency_ms=latency_ms, ingest_ts=decision_ts, **common),
+    ]
 
 
-def test_burst_within_grace_window_is_not_finalized_yet(redis_client):
+async def _feed(entries, user, buffer, store):
+    sent = []
+
+    async def send(user_id, message):
+        sent.append(message)
+
+    for entry in entries:
+        await handle_event(user, entry, buffer, store, send)
+    return sent
+
+
+def test_every_decision_emits_one_session_prefix_message(redis_client):
     store = RedisBaselineStore(redis_client)
-    buffer = _make_buffer(3)
-    last_prompt_ts = buffer[-2]["ts"]
-    now = last_prompt_ts + timedelta(seconds=1)  # well within the 5s grace window
+    buffer = RedisBuffer(redis_client)
+    entries = []
+    for i in range(3):
+        entries += _pair("u1", T0 + timedelta(seconds=30 * i), "deny" if i < 2 else "approve", 4000 - 1000 * i)
+    sent = asyncio.run(_feed(entries, "u1", buffer, store))
 
-    messages, remaining = finalize_ready_bursts_for_user("user1", buffer, now, store)
-    assert messages == []
-    assert len(remaining) == len(buffer)
+    assert [m["decision_index"] for m in sent] == [0, 1, 2]
+    assert [m["feature_vector"]["n_prompts"] for m in sent] == [1, 2, 3]
+    final = sent[-1]
+    assert final["feature_vector"]["capitulation_flag"] is True
+    assert final["feature_vector"]["latency_drift_slope"] < 0
+    assert len(final["sequence"]) == 6
+    assert len({m["episode_id"] for m in sent}) == 1  # one episode id per session
+    # the open session stays buffered (not trimmed) until it closes
+    assert len(buffer.load("u1")) == 6
 
 
-def test_burst_past_grace_window_is_finalized(redis_client):
+def test_replayed_low_and_slow_episode_has_valid_slope_and_whole_deny_run(redis_client):
+    """REMEDIATION_TASK.md A1 verification on the live path: prompts 25
+    minutes apart (beyond the old 15-minute TTL and 5-minute gap) still form
+    one session, so the final decision point carries the whole deny run and
+    a computable latency_drift_slope."""
     store = RedisBaselineStore(redis_client)
-    buffer = _make_buffer(3)
-    last_prompt_ts = buffer[-2]["ts"]
-    now = last_prompt_ts + timedelta(seconds=10)  # past the 5s grace window
+    buffer = RedisBuffer(redis_client)
+    entries = []
+    for i in range(5):
+        entries += _pair("slow", T0 + timedelta(minutes=25 * i), "deny" if i < 4 else "approve", 5000 - 700 * i)
+    sent = asyncio.run(_feed(entries, "slow", buffer, store))
 
-    messages, remaining = finalize_ready_bursts_for_user("user1", buffer, now, store)
-    assert len(messages) == 1
-    assert remaining == []
-    assert messages[0]["feature_vector"]["n_prompts"] == 3
-    assert messages[0]["feature_vector"]["capitulation_flag"] is True
-    assert messages[0]["session_id"] == "session-abc"
-    assert len(messages[0]["sequence"]) == 6  # 3 prompts + 3 decisions
+    final = sent[-1]["feature_vector"]
+    assert final["latency_drift_slope_valid"] is True
+    assert final["deny_run_length"] == 4
+    assert final["n_prompts"] == 5
+    assert final["capitulation_flag"] is True
 
 
-def test_empty_buffer_finalizes_to_nothing(redis_client):
+def test_a_gap_beyond_the_session_threshold_closes_and_commits_the_old_session(redis_client):
     store = RedisBaselineStore(redis_client)
-    messages, remaining = finalize_ready_bursts_for_user("user1", [], T0, store)
-    assert messages == []
-    assert remaining == []
+    buffer = RedisBuffer(redis_client)
+    first = _pair("u2", T0, "approve", 3000)
+    second = _pair("u2", T0 + timedelta(hours=3), "approve", 3000)
+    sent = asyncio.run(_feed(first + second, "u2", buffer, store))
+
+    assert len({m["episode_id"] for m in sent}) == 2
+    assert sent[-1]["feature_vector"]["n_prompts"] == 1
+    # the first session's approval reached the baseline when it closed
+    assert store.load_latency("u2").event_count == 1
+    assert len(buffer.load("u2")) == 2  # only the open session remains
 
 
-def test_enrichment_throughput_on_a_10k_event_burst(redis_client):
-    """5000 prompt/decision pairs = 10,000 raw canonical events, all paced
-    1s apart (one continuous burst). Stands in for the Phase 3 gate's
-    enrichment-latency budget -- see module docstring."""
+def test_per_decision_feature_latency_stays_within_budget(redis_client):
+    """Times handle_event over a 40-prompt session (longer than any
+    generated attack) against real Redis: the median per-decision cost of
+    re-featurising the session-so-far must stay in single-digit ms."""
     store = RedisBaselineStore(redis_client)
-    buffer = _make_buffer(5000, gap_seconds=1.0)
-    assert len(buffer) == 10_000
+    buffer = RedisBuffer(redis_client)
+    entries = []
+    for i in range(40):
+        entries += _pair("fast", T0 + timedelta(seconds=20 * i), "deny", 3000)
 
-    last_prompt_ts = buffer[-2]["ts"]
-    now = last_prompt_ts + timedelta(seconds=10)
+    timings = []
 
-    start = time.perf_counter()
-    messages, remaining = finalize_ready_bursts_for_user("user1", buffer, now, store)
-    elapsed = time.perf_counter() - start
+    async def run():
+        async def send(user_id, message):
+            pass
 
-    assert len(messages) == 1
-    assert remaining == []
-    assert elapsed < 2.0, f"enrichment took {elapsed:.3f}s for 10k events, expected well under 2s"
+        for entry in entries:
+            start = time.perf_counter()
+            await handle_event("fast", entry, buffer, store, send)
+            if entry["event_type"] == "mfa_decision":
+                timings.append(time.perf_counter() - start)
 
-    for key, value in messages[0]["feature_vector"].items():
-        if isinstance(value, float):
-            assert value == value, f"{key} is NaN"
+    asyncio.run(run())
+    timings.sort()
+    median_ms = timings[len(timings) // 2] * 1000
+    assert median_ms < 10.0, f"median per-decision feature latency {median_ms:.2f}ms"
