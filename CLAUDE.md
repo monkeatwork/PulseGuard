@@ -21,7 +21,7 @@ No peer-reviewed work in a credible venue detects MFA fatigue by jointly modelli
 ## Feature families
 
 ### Frequency features
-`prompts_per_window`, `inter_prompt_mean`, `inter_prompt_std`, `burst_duration`, `off_hours_flag`, `geo_novelty`, `device_novelty`, `impossible_travel`
+`prompts_per_window`, `inter_prompt_mean`, `inter_prompt_std`, `burst_duration`, `off_hours_flag`, `geo_novelty`, `device_novelty` (`impossible_travel` is implemented in `features_frequency.py` but not in the model's vector: the RBA base data carries no coordinates)
 
 ### Response-behaviour features (the contribution)
 | Feature | Definition |
@@ -35,15 +35,15 @@ No peer-reviewed work in a credible venue detects MFA fatigue by jointly modelli
 
 ## Architecture — five layers
 
-- **L1 Telemetry** — Entra ID sign-in logs, Okta System Log, Duo Admin API, Keycloak (prototype), benchmark replay. All behind one adapter interface.
+- **L1 Telemetry** — one adapter interface (`TelemetryAdapter`). Implemented: benchmark replay and an interactive victim simulator. Entra ID sign-in logs, Okta System Log and Duo Admin API are future adapters — not implemented.
 - **L2 Ingestion** — FastAPI collectors → Kafka. Canonical event: `{user_id, ts, event_type, decision, decision_latency_ms, src_ip, geo, device_id, user_agent, session_id}`
-- **L3 Feature Engine** — stream windowing; computes both feature families. Per-user baseline store (EWMA prompt rate + latency distribution) in Redis, cohort fallback during cold start (< 30 events).
+- **L3 Feature Engine** — session-level scoring: at every decision the user's session-so-far (no gap > 60 min) is featurised; computes both feature families. Per-user baseline store (EWMA latency) in Redis, cohort fallback during cold start (< 30 events).
 - **L4 Detection Engine** — Stage A per-user statistical deviation; Stage B XGBoost over the full feature vector; Stage C GRU over the event sequence (catches low-and-slow). Weighted fusion, isotonic calibration, SHAP top-3 reasons per alert.
-- **L5 Response** — mitigation controller (suppress blind-approve → force step-up webhook, with cooldown and escalation ceiling to prevent self-inflicted DoS); React SOC dashboard; syslog/CEF egress.
+- **L5 Response** — mitigation controller (suppress blind-approve → force step-up webhook to the IdP — a mock IdP in this prototype — with cooldown and escalation ceiling to prevent self-inflicted DoS); React SOC dashboard; CEF export.
 
 ## Technology stack — Python end to end
 
-Python 3.12 · FastAPI · Apache Kafka + Faust · River (incremental EWMA baselines, drift detection) · Redis · PostgreSQL + TimescaleDB · XGBoost + scikit-learn · PyTorch (GRU) · SHAP · React + Recharts · Keycloak (test IdP) · Docker Compose · pytest + Testcontainers.
+Python 3.12 · FastAPI · Apache Kafka (native KRaft) + Faust · River (incremental EWMA baselines) · Redis · PostgreSQL + TimescaleDB · XGBoost + scikit-learn · PyTorch (GRU training; inference runs the trained GRU in NumPy) · TreeSHAP · React + Recharts · Docker Compose · pytest + Testcontainers.
 
 An all-Python pipeline is deliberate: it removes the cross-language serialisation hop between feature computation and inference. The model loads in-process inside FastAPI so end-to-end scoring stays inside a single-digit-millisecond budget, which in-band mitigation requires.
 
@@ -76,7 +76,7 @@ No public labelled MFA-fatigue dataset exists. The project builds one as a contr
 
 ## Working conventions
 
-- Everything runs from `docker compose up` with no manual setup steps.
+- Everything runs in Docker with no manual setup steps: `config-everything` once, then `run` / `stop` (scripts at the repository root).
 - The benchmark generator is seeded and deterministic.
 - Any design decision made autonomously gets one line in `DECISIONS.md`: what was decided, what alternative was rejected, and why.
 - Feature computation is pure and unit-testable in isolation from the stream.

@@ -1,55 +1,72 @@
-# PulseGuard
+# PulseGuard — developer guide
 
-Behaviour-aware detector for MFA fatigue attacks (MITRE T1621). See
-[`../CLAUDE.md`](../CLAUDE.md) for the full project spec and
-[`DECISIONS.md`](DECISIONS.md) for the log of autonomous design decisions.
+Start with the [root README](../README.md) to run the demo. The spec is [`../CLAUDE.md`](../CLAUDE.md), and every design decision (decided / rejected / why) is in [`DECISIONS.md`](DECISIONS.md).
 
-## Setup
+## Layout
 
-The only setup step is:
+| Path | What lives there |
+|---|---|
+| `common/pulseguard_common/` | Code shared by every service image: the canonical event schema, windows/sessions, both feature families, baselines, the DB models and the Kafka worker helper. |
+| `services/ingestion/` | L1/L2: the `TelemetryAdapter` interface, the replay and simulator adapters, the Kafka producer, the mock IdP (`/idp/*`) and the `kafka-init` topic job. |
+| `services/feature_engine/` | L3: the Faust worker (`streaming_app.py`), per-event session logic (`session_processor.py`) and the baseline read API. |
+| `services/detection_engine/` | L4: the live scorer and the dashboard API, plus offline training, tuning, explanation and `model_registry/`. |
+| `services/mitigation/` | L5: the cooldown/escalation controller, the live worker, the webhook client and the IdP feedback endpoint. |
+| `services/dashboard/` | React + Recharts SOC dashboard, built to static files and served by nginx, which proxies `/api/*`. |
+| `benchmark/` | The seeded generator (RBA benign base plus attack profiles), the Splunk/Elastic baselines, and the episode-length and demo-slice tools. |
+| `eval/` | The frozen by-user harness, the ablation and the adversarial evaluation. `eval/results/` holds every reported number. |
+| `infra/postgres/init.sql` | The schema of record. |
 
+## The unit everything is scored on
+
+A **session** is one user's MFA events with no gap longer than 60 minutes (`sessions.py`). At every `mfa_decision` the session-so-far is featurised and scored, live in the feature engine and offline in `feature_table.py`/`sequence_dataset.py`, through the same functions. An episode is positive if any decision point crosses the threshold, which is the live alerting rule. See DECISIONS.md, "A1/A2 — Session-level scoring".
+
+## Live pipeline API
+
+Everything is reachable through the dashboard origin, `http://localhost:3000/api/<service>/…`:
+
+| Path | Purpose |
+|---|---|
+| `GET /api/ingestion/scenarios?profile=` | Replayable demo episodes |
+| `POST /api/ingestion/scenarios/replay` | Body `{"burst_id": …, "pace_seconds": 0.5, "time_mode": "preserve"}` |
+| `GET /api/ingestion/runs` | Replay/simulator runs |
+| `POST /api/ingestion/simulator` (+ `/{id}`, `/{id}/respond`, `/{id}/login`, `/{id}/stop`) | Interactive victim simulator |
+| `POST /api/ingestion/idp/step-up`, `/idp/alt-factor`; `GET /idp/challenges`; `POST /idp/challenges/{id}/resolve` | Mock IdP |
+| `GET /api/features/baselines/{user}` | A user's EWMA baseline and open session |
+| `GET /api/detection/alerts`, `/alerts/{id}`, `PATCH /alerts/{id}`, `/alerts/{id}/cef` | Alerts and their evidence |
+| `GET /api/detection/scores/recent`, `/stats`, `/operating-point`, `/eval/results`, `/dead-letters` | Live feed, KPIs, the running operating point, offline results, the DLQ |
+| `GET /api/mitigation/actions`, `/state/{user}`; `POST /feedback` | Mitigation history and controller state |
+
+A replay from the command line:
+
+```bash
+curl -s 'localhost:3000/api/ingestion/scenarios?profile=low_and_slow&limit=1'
+curl -s -X POST localhost:3000/api/ingestion/scenarios/replay -H 'content-type: application/json' \
+     -d '{"burst_id":"<burst_id from above>","pace_seconds":0.3}'
+curl -s localhost:3000/api/detection/alerts
 ```
-docker compose up
-```
-
-This brings up Postgres/TimescaleDB, Redis, Redpanda (Kafka-API compatible
-broker), Keycloak (test IdP), and all four backend services plus the SOC
-dashboard, each exposing a `/health` endpoint.
-
-To fetch the benchmark dataset (Wiefling RBA dataset, via Zenodo — see
-`DECISIONS.md`, "RBA dataset source"):
-
-```
-make data
-```
-
-This has no fallback: if the fetch or checksum verification fails, it stops
-with an explicit error rather than substituting synthetic data.
-
-## Repo layout
-
-- `services/` — the four backend services (ingestion, feature_engine,
-  detection_engine, mitigation) plus the React dashboard.
-- `benchmark/` — the seeded, deterministic attack/benign event generator and
-  the industry baseline rules (Splunk, Elastic).
-- `eval/` — the frozen by-user evaluation harness, ablation study, and
-  adversarial evaluation.
-- `common/pulseguard_common/` — the canonical event schema and shared
-  utilities imported by every service.
-
-## Build order
-
-This project is built in the order the evaluation depends on, not the order
-the architecture diagram is drawn in: benchmark generator → industry
-baselines + evaluation harness → feature engine → detection engine (Stage
-A/B, then Stage C + fusion) → mitigation controller → dashboard → ablation.
-See the implementation plan for the full phase breakdown and gates.
 
 ## Tests
 
-```
-make test
+```bash
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m pytest -q --ignore=tests/integration   # unit + Testcontainers tests (Docker required)
+python -m pytest -q tests/integration            # DESTRUCTIVE: brings the compose stack up and down -v
+cd services/dashboard && npm ci && npx vitest run
 ```
 
-Runs the full pytest suite. Integration tests that need Postgres/Redis/
-Redpanda use Testcontainers and require Docker to be running.
+## Rebuilding the benchmark, models and results (offline)
+
+```bash
+make pipeline   # data -> generate -> baselines -> train -> tune -> ablation -> adversarial -> report -> demo slice
+```
+
+`make data` fetches the RBA dataset from Zenodo (about 1.1 GB, MD5-verified) and has **no synthetic fallback**: if the fetch fails it stops. Training writes `model_registry/` (`stage_b.json`, `stage_b_calibrator.pkl`, `stage_c.pt`/`.npz`, `operating_point.json`). The live scorer refuses to start without them. Rebuild the images afterwards (`config-everything`).
+
+## Known issues and limits
+
+- The benchmark's attacks are synthetic overlays on real benign RBA logins. Latency parameters come from published human-subjects measurements, and the benign denial rate is an assumption (see DECISIONS.md).
+- Low-and-slow attacks are generated *without* within-episode fatigue drift, so `latency_drift_slope` carries no signal for that profile by construction. See the ablation result in `final_report.md`.
+- The mitigation controller's per-user state is in memory and resets when the service restarts. `run` always starts fresh anyway.
+- Only the replay and simulator adapters exist; Entra ID, Okta and Duo are future work. The IdP is a mock.
+- `tests/integration/test_compose_health.py` is destructive to a running stack (it tears down with `--volumes`).
