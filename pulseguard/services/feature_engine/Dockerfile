@@ -1,24 +1,24 @@
 FROM python:3.12-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/srv
+
 WORKDIR /srv
 
 COPY common /srv/common
+COPY services/feature_engine/pyproject.toml /srv/services/feature_engine/pyproject.toml
+
+# Dependencies first (cached unless pyproject changes). The optional
+# "extra_ca" build secret exists only for build machines behind a
+# TLS-intercepting proxy (see docker-compose.ca.yml); normal builds skip it.
+RUN --mount=type=secret,id=extra_ca,required=false \
+    if [ -s /run/secrets/extra_ca ]; then export PIP_CERT=/run/secrets/extra_ca; fi; \
+    pip install /srv/common[db] && \
+    mkdir -p /srv/services/feature_engine/app && touch /srv/services/feature_engine/app/__init__.py && \
+    pip install /srv/services/feature_engine && pip uninstall -y pulseguard-feature-engine
+
 COPY services/feature_engine /srv/services/feature_engine
 
-RUN pip install --no-cache-dir /srv/common && \
-    pip install --no-cache-dir -e /srv/services/feature_engine
-
-WORKDIR /srv/services/feature_engine
-
-# streaming_app.py and its own app modules import themselves via the
-# absolute path `services.feature_engine.app.X` -- that only resolves
-# with /srv on the path, which WORKDIR alone does not provide. This is
-# what caused the very first live-process run to fail with
-# ModuleNotFoundError: No module named 'services' (see DECISIONS.md).
-ENV PYTHONPATH=/srv
-
-RUN chmod +x run.sh
 
 EXPOSE 8002
-
-CMD ["./run.sh"]
+CMD ["./services/feature_engine/run.sh"]

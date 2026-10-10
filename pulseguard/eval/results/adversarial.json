@@ -1,5 +1,6 @@
 {
   "n_adversarial_episodes": 400,
+  "unit": "episode (caught if any decision point crosses the persisted operating-point threshold)",
   "baselines": {
     "splunk": {
       "mimicry_adversarial": {
@@ -24,17 +25,27 @@
   },
   "stage_ab": {
     "mimicry_adversarial": {
-      "recall": 0.9279385705847608,
-      "n": 1693
+      "recall": 0.935,
+      "n": 200
     },
     "slow_pacing_adversarial": {
-      "recall": 0.9211340206185566,
-      "n": 1940
+      "recall": 1.0,
+      "n": 200
     }
   },
   "stage_c": {
     "mimicry_adversarial": {
+      "recall": 0.935,
+      "n": 200
+    },
+    "slow_pacing_adversarial": {
       "recall": 1.0,
+      "n": 200
+    }
+  },
+  "full_fusion": {
+    "mimicry_adversarial": {
+      "recall": 0.935,
       "n": 200
     },
     "slow_pacing_adversarial": {

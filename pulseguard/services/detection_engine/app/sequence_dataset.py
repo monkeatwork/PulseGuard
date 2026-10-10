@@ -1,17 +1,14 @@
-"""Builds per-user event sequences for Stage C (CLAUDE.md: "GRU over the
-event sequence... catches low-and-slow").
+"""Builds event sequences for Stage C (CLAUDE.md: "GRU over the event
+sequence... catches low-and-slow").
 
-Unlike Stage A/B, which operate on gap-based bursts, Stage C deliberately
-does NOT re-segment a user's events by gap — that segmentation is exactly
-what hides low-and-slow's cross-fragment pattern from burst-level features
-(DECISIONS.md, "Correction: Phase 4's planned low-and-slow recall target
-was wrong"). The whole point of a sequence model here is to see a user's
-full event history in one pass, so it can connect an early denial to a
-later approval that a fragment-level view cannot.
-
-Evaluation/training unit here is therefore the generator's own `burst_id`
-(one user-episode), matching the granularity Phase 2's industry-baseline
-evaluation already used — not the fragment-level unit Stage A/B trained on.
+Stage C sees the raw step-by-step sequence of a SESSION (sessions.py), so
+it can connect an early denial to a later approval across a low-and-slow
+episode's 20-40 minute gaps. Like Stage A/B (feature_table.py), it is
+scored at every decision point on the session-so-far -- the live path
+receives exactly that prefix in each enriched message -- and an episode is
+predicted positive if any decision point crosses the threshold. Rows come
+from the same `iter_decision_points` iterator as the feature table, so the
+two line up one-to-one.
 """
 
 from __future__ import annotations
@@ -21,7 +18,8 @@ import math
 import numpy as np
 import pandas as pd
 
-from pulseguard_common.windows import PromptDecisionPair, pair_prompts_and_decisions
+from pulseguard_common.sessions import session_pairs
+from pulseguard_common.windows import PromptDecisionPair
 
 SEQUENCE_LENGTH = 20  # DECISIONS.md, "Stage C (GRU) architecture"
 STEP_FEATURE_DIM = 6
@@ -71,28 +69,19 @@ def build_sequence_dataset(
     events_df: pd.DataFrame,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str], list, list[str]]:
     """Returns (X[n, max_len, dim] float32, lengths[n] int, y[n] bool,
-    user_ids[n], attack_profiles[n], burst_ids[n]). `burst_ids` is returned
-    explicitly (not left to be re-derived by callers assuming a matching
-    groupby order elsewhere) so joins against feature_table.py's
-    fragment-level output are exact, not order-dependent."""
-    labelled = events_df[events_df["burst_id"].notna()].copy()
-    X, lengths, y, user_ids, profiles, burst_ids = [], [], [], [], [], []
+    user_ids[n], attack_profiles[n], episode_ids[n]) -- one row per decision
+    point, in the same order as feature_table.build_feature_table."""
+    from services.detection_engine.app.feature_table import iter_decision_points
 
-    for burst_id, group in labelled.groupby("burst_id"):
-        group = group.sort_values("ts")
-        user_id = group.iloc[0]["user_id"]
-        label = bool(group.iloc[0]["label_attack"])
-        raw_profile = group.iloc[0]["attack_profile"]
-        profile = None if pd.isna(raw_profile) else raw_profile
-        events = group.to_dict("records")
-        pairs = pair_prompts_and_decisions(events)
-        seq, length = pairs_to_sequence(pairs)
+    X, lengths, y, user_ids, profiles, burst_ids = [], [], [], [], [], []
+    for point, _ in iter_decision_points(events_df):
+        seq, length = pairs_to_sequence(session_pairs(point.prefix_events))
         X.append(seq)
         lengths.append(length)
-        y.append(label)
-        user_ids.append(user_id)
-        profiles.append(profile)
-        burst_ids.append(burst_id)
+        y.append(point.label_attack)
+        user_ids.append(point.user_id)
+        profiles.append(point.attack_profile)
+        burst_ids.append(point.episode_id)
 
     if not X:
         return (

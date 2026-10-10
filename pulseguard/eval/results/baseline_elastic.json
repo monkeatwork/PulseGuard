@@ -2,13 +2,13 @@
   "split": "test",
   "n_bursts_evaluated": 3859,
   "overall": {
-    "tp": 1446,
-    "fp": 0,
-    "tn": 1537,
-    "fn": 876,
-    "precision": 1.0,
-    "recall": 0.6227390180878553,
-    "fpr": 0.0
+    "tp": 1416,
+    "fp": 4,
+    "tn": 1533,
+    "fn": 906,
+    "precision": 0.9971830985915493,
+    "recall": 0.6098191214470284,
+    "fpr": 0.002602472348731295
   },
   "by_profile": {
     "low_and_slow": {
@@ -21,31 +21,31 @@
       "fpr": null
     },
     "social_engineering_assisted": {
-      "tp": 781,
+      "tp": 765,
       "fp": 0,
       "tn": 0,
-      "fn": 0,
+      "fn": 16,
       "precision": 1.0,
-      "recall": 1.0,
+      "recall": 0.9795134443021767,
       "fpr": null
     },
     "high_volume_burst": {
-      "tp": 665,
+      "tp": 651,
       "fp": 0,
       "tn": 0,
-      "fn": 120,
+      "fn": 134,
       "precision": 1.0,
-      "recall": 0.8471337579617835,
+      "recall": 0.8292993630573249,
       "fpr": null
     },
     "benign_high_activity": {
       "tp": 0,
-      "fp": 0,
-      "tn": 1537,
+      "fp": 4,
+      "tn": 1533,
       "fn": 0,
-      "precision": null,
+      "precision": 0.0,
       "recall": null,
-      "fpr": 0.0
+      "fpr": 0.002602472348731295
     }
   }
 }

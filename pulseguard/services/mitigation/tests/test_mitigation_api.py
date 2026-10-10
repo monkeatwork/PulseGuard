@@ -3,6 +3,7 @@ Postgres (Testcontainers, the actual infra/postgres/init.sql schema)."""
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,7 +16,9 @@ from sqlalchemy.orm import sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
 from pulseguard_common.db.session import get_db
-from services.mitigation.app.main import app
+
+os.environ["MITIGATION_WORKER"] = "off"  # API-only; the worker's handler is tested directly
+from services.mitigation.app.main import app  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 INIT_SQL_PATH = REPO_ROOT / "infra" / "postgres" / "init.sql"
@@ -115,3 +118,65 @@ def test_list_actions_empty_for_unknown_user(client):
     response = client.get("/actions?user_id=nobody")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_feedback_failures_escalate_and_a_pass_resets(client):
+    for _ in range(3):
+        body = client.post("/feedback", json={"user_id": "fb-user", "passed": False}).json()
+    assert len(body["recent_failures"]) == 3
+    state = client.get("/state/fb-user").json()
+    assert state["policy"]["lockout_possible"] is False
+    body = client.post("/feedback", json={"user_id": "fb-user", "passed": True}).json()
+    assert body["recent_failures"] == []
+
+
+def test_alert_handler_links_action_to_alert_and_escalates_without_lockout(session_factory):
+    """End-to-end through the worker's handler with a real schema: first
+    alert -> step-up; failed step-ups reported by the IdP -> alt factor once
+    the cooldown passes; never anything else."""
+    import json as _json
+
+    from services.mitigation.app.controller import UserMitigationState
+    from services.mitigation.app.live_worker import AlertHandler, UserStates
+
+    class Webhook:
+        def __init__(self):
+            self.calls = []
+
+        def trigger_step_up(self, user_id, session_id, reason):
+            self.calls.append("step_up")
+            return True
+
+        def trigger_alt_factor(self, user_id, session_id, reason):
+            self.calls.append("alt_factor")
+            return True
+
+    db = session_factory()
+    alert_id = uuid.uuid4()
+    db.execute(text("INSERT INTO alerts (alert_id, user_id, ts, updated_ts, fused_score) VALUES (:a, 'h-user', now(), now(), 0.9)"),
+               {"a": str(alert_id)})
+    db.commit()
+    db.close()
+
+    states, webhook = UserStates(), Webhook()
+    handler = AlertHandler(session_factory, webhook, states)
+    msg = _json.dumps({"alert_id": str(alert_id), "user_id": "h-user", "fused_score": 0.9}).encode()
+    assert handler(msg) == "step_up_required"
+    assert handler(msg) == "cooldown_active"
+    # three failed step-ups, then the cooldown lapses
+    state: UserMitigationState = states.get("h-user")
+    now = datetime.now(timezone.utc)
+    for _ in range(3):
+        state.record_failure(now)
+    state.last_step_up_ts = now - timedelta(hours=1)
+    assert handler(msg) == "alt_factor_required"
+    assert webhook.calls == ["step_up", "alt_factor"]
+
+    db = session_factory()
+    rows = db.execute(text("SELECT action_type, alert_id FROM mitigation_actions WHERE user_id='h-user' ORDER BY ts")).all()
+    db.close()
+    assert [r[0] for r in rows] == ["step_up_required", "cooldown_active", "alt_factor_required"]
+    assert all(str(r[1]) == str(alert_id) for r in rows)
+    # a below-threshold alert is not even considered
+    low = _json.dumps({"alert_id": str(alert_id), "user_id": "h-user", "fused_score": 0.01}).encode()
+    assert handler(low) is None

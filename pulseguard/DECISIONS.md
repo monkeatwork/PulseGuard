@@ -413,3 +413,152 @@ This is the **same root cause already disclosed for `latency_drift_slope`** — 
 ## 2026-10-11 — Repository root and line endings
 
 **Decided:** the git repository is rooted at the project folder, one level above `pulseguard/`, so `CLAUDE.md` is versioned alongside the code and `README.md`'s `../CLAUDE.md` link resolves in a clone. **Rejected:** rooting it at `pulseguard/`, which would leave the authoritative spec outside version control. **Decided:** a root `.gitattributes` pins every text file to LF (`* text=auto eol=lf`). **Rejected:** relying on each machine's `core.autocrlf`; Git for Windows defaults it to `true`, which checks `services/feature_engine/run.sh` out with CRLF, and the feature-engine container then fails on its `#!/bin/sh` line, breaking the "`docker compose up` is the only setup step" rule.
+
+## 2026-10-11 — Remediation (REMEDIATION_TASK.md), part 1: design changes
+
+The entries below record each remediation fix as decided / rejected / why. Every number they will affect is re-measured in part 2, after the single retrain-and-re-evaluate pass; nothing here claims a result.
+
+### A1/A2 — Session-level scoring at every decision point (one fix for both)
+
+**Decided:** a new unit, the *session*: one user's MFA events with no gap longer than `SESSION_GAP_THRESHOLD_SECONDS` = 60 min (`common/pulseguard_common/sessions.py`). 60 minutes is strictly above low-and-slow's widest pacing (40 min) and is pinned to it by a test. At every `mfa_decision` the session-so-far is featurised and scored. Offline (`feature_table.py`, `sequence_dataset.py`) and live (`services/feature_engine/app/session_processor.py`) run this through the same pure functions. An episode counts as predicted-positive if *any* of its decision points crosses the threshold, which is exactly the live rule (the first crossing raises the alert). The 5-minute fragment segmentation in `windows.py` is untouched. `prompts_per_window` still counts a 10-minute window, so the fragment semantics the design wanted are kept, and they now sit *inside* a session instead of replacing it. The Redis buffer TTL rises from 15 min to 2 h, as a backstop above the session gap. The feature engine refreshes the buffer on every event and closes idle sessions itself.
+
+**Rejected:** (1) raising the 5-minute gap threshold, which would merge the fragments the design deliberately keeps separate; (2) re-running the frozen harness at fragment granularity, which would keep a unit under which every response-behaviour feature is undefined for the attack the project exists to catch; (3) scoring a session only once it has closed (60 minutes of silence), which would make mitigation post-hoc rather than in-band.
+
+**Why:** it fixes both defects at their shared root. The live path now scores the same object the evaluation scores, at the same threshold, and `latency_drift_slope` / `deny_run_length` span the whole low-and-slow episode. The extra cost of re-featurising the session on every decision is measured by `test_per_decision_feature_latency_stays_within_budget` (median < 10 ms against real Redis), and live scoring is measured at ~1.3 ms p50.
+
+**Also decided here:** baselines advance once per *closed* session (`enrichment.commit_baselines`), never per decision point, so repeated scoring of a growing session cannot score a session against itself. The clock-skew exclusion now uses a real per-session median of `ingest_ts - ts` (`session_processor.rolling_median_skew_seconds`); before this, the documented "rolling median" was a hard-coded 0.
+
+### A2 consequence — Stage A reads the windowed prompt count
+
+**Decided:** Stage A's high-volume signal reads `prompts_per_window > 9` instead of `n_prompts > 9`. **Rejected:** keeping `n_prompts`. **Why:** the signal's documented intent is to mirror Splunk's ">9 prompts in 10 minutes". At fragment granularity `n_prompts` happened to approximate that. At session granularity it is a whole session's length, which a benign power user legitimately reaches over a day, so keeping it would have turned a documented rule into a different one by accident. This is a correctness fix to match the stated rule, not a tuning step; it was made before any real-data run.
+
+### A3 — The high-activity hard negative denies
+
+**Decided:** in `generate_benign_high_activity_session`, each login is denied with probability `BENIGN_HIGH_ACTIVITY_DENIAL_PROBABILITY` = 0.08 and then re-attempted 10–120 s later and approved. The denial and the retry both draw from the existing published benign latency distributions. A benign deny is never followed by another deny, so it cannot form a capitulation signature by construction. `benign_occasional_denial` also gains 0–6 ordinary follow-up approvals. **Rejected:** a separate new "denying power user" profile, which would leave the main hard negative still deny-free. **Why:** "any denial at all ⇒ attack" stops being a free shortcut. The 8% rate is an assumption (no published per-login denial rate was found) and is recorded here as one. No latency parameter was invented.
+
+### A4 — Episode lengths overlap
+
+**Decided:** prompt-count ranges become high-volume 6–25, low-and-slow 4–14, social-engineering 5–15 with the lure landing at a uniform 30–90% of the planned burst, benign high-activity 6–39 logins/day (plus denial retries), and occasional-denial 2–8. `benchmark/generator/episode_lengths.py` writes the measured distribution and pairwise overlap to `eval/results/episode_lengths.json`, which the report and the dashboard read. **Rejected:** padding sequences to a fixed length, which hides length from the GRU without making the benchmark itself honest. **Why:** a sequence model should not be able to separate the classes by counting events.
+
+### B2 — Persisted operating point; no defaults
+
+**Decided:** `tune_fusion_weights.py` writes `model_registry/operating_point.json` (weights, threshold, per-stage thresholds, seed, corpus SHA-256, `tuned_on: "val"`). `live_scorer.LiveScorer` loads it and every model artifact, or raises, and the detection engine's startup fails. An operating point tuned on anything other than `val` is rejected. **Rejected:** falling back to `FusionWeights()` defaults or an env-var threshold. Silently defaulting is the bug being fixed. **Why:** the running system must be the evaluated one. Tests: `test_live_scorer.py`.
+
+### B3 — Fusion search: finer grid, threshold-free tie-break
+
+**Decided:** weight grid step 0.05 (231 simplex points, was 0.1). Ties in validation F1 are broken by validation average precision of the episode score, and only then by grid order. **Rejected:** forcing non-zero weights on any stage, which would be tuning for appearance and is forbidden. **Why:** the old search took the first best F1 it met. Iterating a ascending, then b ascending, it resolved every tie toward the highest weight on Stage C, which is one way a (0, 0, 1) result can be an artifact of the search rather than of the data. The outcome on real data is reported in part 2, whatever it is.
+
+### B4 — Explanations come from the component that drove the score
+
+**Decided:** for each alert, each stage's contribution (weight × normalised score) is computed. The top-3 reasons come from the largest contributor and are labelled with it: Stage A's own signals, Stage B's exact TreeSHAP (XGBoost `pred_contribs`), or Stage C occlusion attribution (zero one step-feature across the sequence, measure the change in logit). **Rejected:** always explaining with Stage B (the old behaviour, which explained a zero-weight model), and dropping explanations whenever B is not dominant. **Why:** a reason shown to an analyst has to be attributable to the component that fired the alert. `test_explain_attribution.py` pins that a zero-weight stage can never be the explanation source. `test_shap_top3.py` still checks that Stage B's SHAP surfaces a response-behaviour feature, which is meaningful whenever Stage B is the source.
+
+### C1 — At-least-once Kafka consumption with a dead-letter path
+
+**Decided:** `pulseguard_common/kafka_worker.py`, shared by the live scorer and the mitigation worker. Auto-commit is off. After a successful handle, that message's offset is committed synchronously. If the handler raises, the message goes to the `pulseguard.dlq` topic and the `dead_letters` table, and only then is the offset committed. If the dead-letter write itself fails, the offset is not committed and the consumer seeks back to retry. Handlers are idempotent: alerts are upserted by episode, and score and event rows use `ON CONFLICT DO NOTHING`. **Rejected:** catch-all-and-log (the old behaviour), and committing before processing. **Why:** a message that cannot be processed must be preserved and visible, and offsets must never pass an unprocessed message. Tests: `test_kafka_worker_commits.py`; idempotency under redelivery is in `test_live_scorer.py`.
+
+### C2 — Persist → send → trim, made deliberate
+
+**Decided:** the feature engine appends each event to Redis first, sends any enriched message, and only then commits closed sessions and trims them from the buffer. The ordering is documented as load-bearing in `session_processor.py`. `test_send_happens_before_the_buffer_is_trimmed` fails if the trim ever moves ahead of the send, and `test_a_failed_send_leaves_the_buffer_untrimmed` covers the crash case. **Why:** the at-least-once property had been accidental.
+
+### C3 — Context per session
+
+**Decided:** geo/device context comes from each session's own last event (`sessions.session_context`), never from "the last event in the user's buffer". Test: `test_each_session_uses_its_own_geo_and_device_context`.
+
+### C4 — Partitions
+
+**Decided:** `pulseguard.events.raw`, `.enriched` and `.alerts` have 3 partitions and `pulseguard.dlq` has 1. They are created explicitly by the one-shot `kafka-init` job. Every producer keys by `user_id`, so a user's events stay ordered within one partition. **Why:** the Faust-table co-partitioning constraint behind the earlier decision to use 1 partition no longer applies, because the buffer lives in Redis and the app declares no tables. A single worker still consumes all partitions; scaling out is now a replica count, not a redesign.
+
+### D1/D2 — Adapter interface; Keycloak replaced by a mock IdP
+
+**Decided:** `services/ingestion/app/adapters/base.py` defines `TelemetryAdapter`. `ReplayAdapter` and the new interactive `SimulatorSession` are its two implementations. Entra ID, Okta and Duo adapters are *not* implemented, and `CLAUDE.md` now says so. Keycloak is removed. The mitigation controller's step-up webhook goes to a small mock IdP inside the ingestion service (`/idp/*`). It records challenges (`idp_challenges`), suspends blind push approval for a challenged user, and reports the challenge outcome back to the controller (`POST /feedback`), which is what drives the alternate-factor escalation. **Rejected:** wiring Keycloak. Its JVM alone is roughly a third of the 1.5 GB memory budget, and it has no native push-MFA step-up API to call. Keeping an idle container was also rejected (REMEDIATION_TASK.md: "a container that exists only to look complete is worse than no container"). **Why:** an honest scope, and a webhook round trip that actually closes the loop.
+
+## 2026-10-11 — Running on a laptop with 1.5 GB for Docker
+
+**Decided:** keep Docker as the only dependency, and slim the stack to about 0.7 GB measured at idle under per-service `mem_limit`s:
+- Redpanda (minimum reservation 512 MB) is replaced by `apache/kafka-native` 3.8 in single-node KRaft mode. It speaks the same Kafka protocol, so no client code changed.
+- Keycloak is removed (D2).
+- The dashboard is served as a static build by nginx, which also reverse-proxies `/api/*`. That removes the browser's cross-origin calls; there was no CORS middleware, so the old dashboard could not have called the APIs from another port at all. Only the dashboard port is published.
+- The live detection engine no longer imports torch or shap. The GRU forward pass runs in NumPy (`stage_c_numpy.py`, pinned to torch's output by `test_stage_c_numpy_parity.py`), and TreeSHAP comes from XGBoost's built-in `pred_contribs`. The container uses `xgboost-cpu`.
+
+Training still uses torch, offline. A side effect: per-decision scoring dropped from ~12 ms to ~1.3 ms p50, mostly because XGBoost is pinned to one thread (spinning up its thread pool cost ~10 ms per call).
+
+**Rejected:**
+- AWS-hosted Postgres/Redis/Kafka. Managed Kafka and Redis are VPC-only, and RDS lacks TimescaleDB.
+- A no-infrastructure "lite" mode. The owner chose to run the real architecture.
+- Native installs on the laptop. Kafka and Redis have no good native Windows builds.
+
+**Why:** the owner's machine has about 1.5 GB for Docker, and the demo must come up with three commands: `config-everything`, `run`, `stop`. `run` always starts from a clean database (`down --volumes` first), so there are no migrations to manage.
+
+## 2026-10-11 — Demo corpus shipped with the repository
+
+**Decided:** `data/demo/demo_events.parquet` holds 12 episodes per profile, drawn only from **test-split** users, evenly spaced across each profile's length range and chosen deterministically from the seed (`benchmark/generator/demo_slice.py`). The trained model artifacts and the operating point are committed under `model_registry/`. **Rejected:** downloading the 1.1 GB RBA archive on the presentation laptop, and showing training-split episodes in the demo. **Why:** the demo must work offline and must not replay data any model was fitted or tuned on. The derived slice inherits the RBA dataset's CC BY 4.0 licence, which is attributed in the README.
+
+## 2026-10-11 — Replay preserves original timestamps
+
+**Decided:** the replay adapter's default `preserve` mode keeps every event's original spacing, anchors the episode to end at the moment the replay started, and publishes events `pace_seconds` apart. `ingest_ts` follows the corpus (`ingest_ts = ts`, as generated). Each replay runs as a fresh user id, `<user>~<run>`. **Rejected:** the old compressed-timestamp mode as the default (still available as `realtime`). **Why:** compressing a low-and-slow attack's 30-minute gaps into seconds changes the frequency features, so the live demo would no longer compute the features the evaluation scored. Preserving the timestamps lets a five-hour episode replay in seconds with identical features. Scoring is event-driven and sessions close on processing-time idleness, so historical timestamps are safe. `~` was chosen as the separator because `#` starts a URL fragment.
+
+## 2026-10-11 — Report renderer edited for labels only (harness rule 8)
+
+`eval/harness/report.py` is part of the frozen harness. It was edited only to change presentation: the stale "(fragment-level)" label became "Stage A+B", a "Full fusion" row was added to the adversarial table, the operating point and unit are printed, and the ablation's supplementary deltas are shown. No metric computation in `eval/harness/` changed (`split.py`, `metrics.py` and `run_eval.py` are untouched). The ablation still reports the recall-based lift with its automatic, non-suppressible banner. F1, FPR and average-precision deltas are added *alongside* it, because recall can saturate at the operating threshold and hide a difference that shows up elsewhere.
+
+## 2026-10-11 — Remediation, part 2: re-measured results (one retrain-and-re-evaluate pass)
+
+All numbers below come from `eval/results/*.json` on the regenerated corpus.
+- **Dataset:** RBA archive re-fetched from Zenodo and MD5-verified.
+- **Corpus:** seed 42, 50,000 users, 749,744 events, `events_sha256` 71637af8…
+- **Determinism:** a second generation from the same seed was byte-identical.
+- **Test split:** 3,859 episodes, by user.
+
+**Industry baselines, re-reproduced on the new corpus:**
+- Splunk: recall 0.337, precision 1.000, FPR 0.000 (was 0.336 / 1.000 / 0.000).
+- Elastic: recall 0.610, precision 0.997, FPR **0.003** (was 0.623 / 1.000 / 0.000). Elastic got slightly *worse*, and for an understood reason: A3 gave the benign high-activity users genuine denials, so "two denials then a success" now fires on a few honest users.
+
+**A4 (lengths overlap), measured** (`episode_lengths.json`): prompts per episode, p5–p95.
+
+| Profile | p5–p95 |
+|---|---|
+| Benign power user | 8–41 |
+| Occasional denial | 2–8 |
+| High-volume burst | 7–25 |
+| Low-and-slow | 4–14 |
+| Social-engineering assisted | 3–11 |
+
+Every attack profile overlaps at least one benign profile.
+
+**B1/B5: Stage C, the second mandatory disclosure.** Stage C dropped from 1.000 / 1.000 / FPR 0.000 to recall **0.993**, precision 1.000, FPR **0.001**. The drop is small. With length no longer a give-away, the GRU still separates the classes on decision content, but it is no longer perfect, and the old perfect score is not a result to quote.
+
+**B3: the fusion outcome.** The validation search (0.05 grid, average-precision tie-break) now chooses a genuine mixture: **A = 0.10, B = 0.85, C = 0.05**, threshold **0.67**. It is no longer the old (0, 0, 1) collapse to Stage C. On test, full fusion scores recall **1.000**, precision **0.999**, FPR **0.0013** (TP 2321, FP 2, TN 1535, FN 1). The "weighted fusion of three stages" claim therefore holds in the narrow sense that all three weights are non-zero, but the honest description is that **Stage B dominates**. Stages A and C contribute small corrections. The explanations follow from this (B4): almost every alert is explained by Stage B's TreeSHAP.
+
+**Stage A as a standalone rule is not usable at session granularity, and this is reported, not tuned away.**
+- "Stage A OR Stage B" (the historical Stage A+B row): recall 1.000, FPR **0.633**. Was 0.936 / 0.088 at fragment level, a different unit.
+- Stage A alone: FPR 0.633. Stage B alone: recall 0.999, FPR 0.001.
+
+Both halves are now reported separately (`stage_ab.json`: `stage_a_only`, `stage_b_only`). A diagnostic on held-out benign rows found that Stage A's firings come mostly from `latency_drift_slope` (3,122 of 4,067) and the approval z-score (945). A benign session's first few decision points have only 2–4 latencies, and a fixed |slope| > 1000 ms/prompt rule is noise there. Stage A's constants (`DRIFT_SLOPE_NORMALIZATION_MS = 500`, flag threshold 2.0) were deliberately **not** changed after seeing this, because that would be tuning on observed test behaviour. The validation-tuned fusion gives Stage A a weight of 0.10, which is what neutralises it in the deployed system.
+
+**B5: `latency_drift_slope`, the first mandatory disclosure — still no measurable lift.**
+- Ablation recall: frequency-only 0.991, full 0.999, full minus slope 1.000.
+- Slope lift: **−0.1 pp**, and the automatic NO MEASURABLE LIFT banner fires.
+- Supplementary: F1 −0.0002; FPR 0.0007 lower *with* the slope, about one episode; average precision −0.0002.
+
+The structural cause found earlier (the slope was undefined at fragment granularity) is fixed: the slope is now computed across whole sessions, including low-and-slow. It still adds nothing measurable, for two reasons that are properties of this benchmark:
+- High-volume and social-engineering attacks are already separated by `deny_run_length`, `capitulation_flag` and the windowed prompt count, which co-vary with the fatigue decay.
+- The generator models low-and-slow attacks with no within-episode fatigue drift at all, so the slope has nothing to find there by construction.
+
+The CLAUDE.md sentence calling it "the single most important feature in the system" is therefore **a hypothesis this benchmark does not support**; the measurement stands. A benchmark that models fatigue drift for paced attacks, or real human-subjects latency traces, would be needed to test it.
+
+**The response-behaviour family as a whole.** Recall lift is **0.8 pp**, below the 2-point floor, so that banner fires too. The family's measured contribution is on **false positives**: FPR falls from **0.069** with frequency features only to **0.0007** with response behaviour (precision 0.956 → 1.000, F1 +0.026). This is the honest form of the project's claim on this benchmark: reading the user's reaction is what stops the benign power users from being flagged.
+
+**Adversarial**, at the persisted operating point (the old run used ad-hoc 0.5 thresholds):
+- Mimicry recall: Splunk 0.025, Elastic 0.110, Stage A+B / Stage C / fusion 0.935.
+- Slow-pacing recall: Splunk 0.000, Elastic 0.000, Stage A+B / Stage C / fusion 1.000.
+- The anti-DoS invariant **holds**.
+
+**Live path = evaluated path (A2/B2), checked end to end.** With `./run.sh`, all 60 shipped demo episodes (12 per profile, test-split users only) were replayed through ingestion → Kafka → feature engine → detection → mitigation. **60/60** were judged correctly: all 36 attacks raised an alert and a step-up challenge, and none of the 24 benign episodes alerted. There were 0 dead letters. Scoring latency was **1.48 ms p50 / 2.72 ms p95** per decision. The whole stack used about **845 MB** under that load. The ingestion limit was raised from 192 MB to 256 MB after it peaked at 161 MB.
+
+**Where things got worse, in one place:**
+- Elastic FPR: 0.000 → 0.003.
+- Stage C: 1.000 → 0.993 recall, 0.000 → 0.001 FPR.
+- Fusion FPR: 0.000 → 0.0013.
+- Stage A+B is now reported at episode granularity, where its FPR is 0.633.
+
+None of these was tuned back.

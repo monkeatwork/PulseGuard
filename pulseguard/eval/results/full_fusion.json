@@ -1,20 +1,16 @@
 {
   "split": "test",
+  "unit": "episode (positive if any decision point crosses the threshold)",
   "n_episodes_evaluated": 3859,
-  "weights": {
-    "a": 0.0,
-    "b": 0.0,
-    "c": 1.0
-  },
-  "threshold": 0.01,
+  "n_bursts_evaluated": 3859,
   "overall": {
-    "tp": 2322,
-    "fp": 0,
-    "tn": 1537,
-    "fn": 0,
-    "precision": 1.0,
-    "recall": 1.0,
-    "fpr": 0.0
+    "tp": 2321,
+    "fp": 2,
+    "tn": 1535,
+    "fn": 1,
+    "precision": 0.9991390443392165,
+    "recall": 0.9995693367786391,
+    "fpr": 0.0013012361743656475
   },
   "by_profile": {
     "low_and_slow": {
@@ -27,12 +23,12 @@
       "fpr": null
     },
     "social_engineering_assisted": {
-      "tp": 781,
+      "tp": 780,
       "fp": 0,
       "tn": 0,
-      "fn": 0,
+      "fn": 1,
       "precision": 1.0,
-      "recall": 1.0,
+      "recall": 0.998719590268886,
       "fpr": null
     },
     "high_volume_burst": {
@@ -46,12 +42,20 @@
     },
     "benign_high_activity": {
       "tp": 0,
-      "fp": 0,
-      "tn": 1537,
+      "fp": 2,
+      "tn": 1535,
       "fn": 0,
-      "precision": null,
+      "precision": 0.0,
       "recall": null,
-      "fpr": 0.0
+      "fpr": 0.0013012361743656475
     }
-  }
+  },
+  "weights": {
+    "a": 0.1,
+    "b": 0.85,
+    "c": 0.05
+  },
+  "threshold": 0.67,
+  "validation_f1": 0.9997790055248619,
+  "weight_grid_step": 0.05
 }

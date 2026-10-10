@@ -1,3 +1,5 @@
+> **Status (2026-10-11): addressed.** Each item below is resolved in code and recorded in `DECISIONS.md` ("Remediation (REMEDIATION_TASK.md)" entries), with the re-measured results in `eval/results/` and `final_report.md`. This file is kept as the record of what was asked.
+
 # Remediation task — PulseGuard
 
 You are working on **PulseGuard**, a behaviour-aware detector for MFA fatigue attacks

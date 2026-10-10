@@ -7,6 +7,7 @@ pipeline is wired to populate them yet (see main.py's module docstring).
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -19,7 +20,9 @@ from sqlalchemy.orm import sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
 from pulseguard_common.db.session import get_db
-from services.detection_engine.app.main import app
+
+os.environ["LIVE_SCORER"] = "off"  # API-only tests; the worker is covered in test_live_scorer.py
+from services.detection_engine.app.main import app  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 INIT_SQL_PATH = REPO_ROOT / "infra" / "postgres" / "init.sql"
@@ -65,9 +68,8 @@ def client(session_factory):
 @pytest.fixture(autouse=True)
 def _clean_tables(session_factory):
     db = session_factory()
-    db.execute(text("DELETE FROM mitigation_actions"))
-    db.execute(text("DELETE FROM alerts"))
-    db.execute(text("DELETE FROM events"))
+    for table in ("mitigation_actions", "alerts", "events", "scores", "scenario_runs", "idp_challenges", "dead_letters"):
+        db.execute(text(f"DELETE FROM {table}"))
     db.commit()
     db.close()
     yield
@@ -78,8 +80,8 @@ def _insert_alert(session_factory, alert_id, user_id, ts, fused_score, shap_top3
     db.execute(
         text(
             """
-            INSERT INTO alerts (alert_id, user_id, ts, fused_score, shap_top3, burst_id)
-            VALUES (:alert_id, :user_id, :ts, :fused_score, CAST(:shap_top3 AS JSONB), :burst_id)
+            INSERT INTO alerts (alert_id, user_id, ts, updated_ts, fused_score, shap_top3, burst_id)
+            VALUES (:alert_id, :user_id, :ts, :ts, :fused_score, CAST(:shap_top3 AS JSONB), :burst_id)
             """
         ),
         {
@@ -95,9 +97,8 @@ def _insert_alert(session_factory, alert_id, user_id, ts, fused_score, shap_top3
     db.close()
 
 
-def test_health_endpoint():
-    with TestClient(app) as test_client:
-        response = test_client.get("/health")
+def test_health_endpoint(client):
+    response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
@@ -135,8 +136,8 @@ def test_get_alert_detail_includes_shap_and_sequence(client, session_factory):
         text(
             """
             INSERT INTO events (event_id, user_id, ts, event_type, decision, decision_latency_ms,
-                                 src_ip, device_id, user_agent, session_id, ingest_ts)
-            VALUES (:eid, :uid, :ts, 'mfa_decision', 'deny', 3000, '10.0.0.1', 'd1', 'ua', :sid, :ts)
+                                 src_ip, device_id, user_agent, session_id, episode_id, ingest_ts)
+            VALUES (:eid, :uid, :ts, 'mfa_decision', 'deny', 3000, '10.0.0.1', 'd1', 'ua', 'idp-s', :sid, :ts)
             """
         ),
         {"eid": str(uuid.uuid4()), "uid": "user1", "ts": T0, "sid": session_id},
@@ -165,3 +166,38 @@ def test_export_cef_returns_well_formed_line(client, session_factory):
     assert response.status_code == 200
     assert response.text.startswith("CEF:0|PulseGuard|")
     assert "suser=user1" in response.text
+
+
+def test_alert_status_can_be_triaged(client, session_factory):
+    alert_id = uuid.uuid4()
+    _insert_alert(session_factory, alert_id, "user1", T0, 0.9)
+    response = client.patch(f"/alerts/{alert_id}", json={"status": "acknowledged"})
+    assert response.status_code == 200
+    assert client.get(f"/alerts/{alert_id}").json()["status"] == "acknowledged"
+    assert client.patch(f"/alerts/{alert_id}", json={"status": "deleted"}).status_code == 422
+
+
+def test_stats_and_recent_scores(client, session_factory):
+    db = session_factory()
+    for i, ms in enumerate([2.0, 4.0, 6.0]):
+        db.execute(
+            text(
+                """INSERT INTO scores (ts, user_id, episode_id, decision_index, decision, decision_latency_ms,
+                   stage_a_score, stage_b_score, stage_c_score, fused_score, threshold, raised, scoring_ms)
+                   VALUES (:ts, 'u', 'ep', :i, 'deny', 1000, 0, 0.1, 0.2, 0.15, 0.5, false, :ms)"""
+            ),
+            {"ts": T0 + timedelta(seconds=i), "i": i, "ms": ms},
+        )
+    db.commit()
+    db.close()
+    stats = client.get("/stats").json()
+    assert stats["decisions_scored"] == 3
+    assert stats["sessions_scored"] == 1
+    assert stats["scoring_ms_p50"] == 4.0
+    recent = client.get("/scores/recent?limit=2").json()
+    assert [r["decision_index"] for r in recent] == [2, 1]
+
+
+def test_eval_results_are_served_verbatim(client):
+    body = client.get("/eval/results").json()
+    assert isinstance(body, dict)

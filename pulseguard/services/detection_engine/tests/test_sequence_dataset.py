@@ -66,12 +66,27 @@ def test_build_sequence_dataset_shapes_and_labels():
     df = pd.DataFrame(rows)
 
     X, lengths, y, user_ids, profiles, burst_ids = build_sequence_dataset(df)
-    assert X.shape == (2, SEQUENCE_LENGTH, STEP_FEATURE_DIM)
-    assert lengths.shape == (2,)
-    assert y.shape == (2,)
-    assert set(y.tolist()) == {True, False}
+    # one row per decision point: 5 for the attack episode, 1 for the benign one
+    assert X.shape == (6, SEQUENCE_LENGTH, STEP_FEATURE_DIM)
+    # episodes are visited in sorted episode-id order: burst_bh, then burst_hv
+    assert burst_ids == ["burst_bh"] + ["burst_hv"] * 5
+    assert lengths.tolist() == [1, 1, 2, 3, 4, 5]
+    assert y.tolist() == [False] + [True] * 5
     assert set(user_ids) == {"attacker1", "poweruser1"}
-    assert set(burst_ids) == {"burst_hv", "burst_bh"}
+
+
+def test_sequence_rows_align_with_feature_table_rows():
+    from services.detection_engine.app.feature_table import build_feature_table
+
+    rows = []
+    rows += _burst_rows("attacker1", "burst_hv", True, "high_volume_burst",
+                         [(i * 30, "deny" if i < 4 else "approve", 1.0) for i in range(5)])
+    rows += _burst_rows("poweruser1", "burst_bh", False, None, [(0, "approve", 2.0), (600, "approve", 2.0)])
+    df = pd.DataFrame(rows)
+    _, lengths, _, _, _, burst_ids = build_sequence_dataset(df)
+    table = build_feature_table(df)
+    assert burst_ids == table["generator_burst_id"].tolist()
+    assert lengths.tolist() == table["n_prompts"].tolist()
 
 
 def test_build_sequence_dataset_empty_input():

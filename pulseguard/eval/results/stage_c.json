@@ -1,15 +1,16 @@
 {
   "split": "test",
+  "unit": "episode (positive if any decision point crosses the threshold)",
   "n_episodes_evaluated": 3859,
-  "threshold": 0.01,
+  "n_bursts_evaluated": 3859,
   "overall": {
-    "tp": 2322,
-    "fp": 0,
-    "tn": 1537,
-    "fn": 0,
-    "precision": 1.0,
-    "recall": 1.0,
-    "fpr": 0.0
+    "tp": 2306,
+    "fp": 1,
+    "tn": 1536,
+    "fn": 16,
+    "precision": 0.9995665366276549,
+    "recall": 0.9931093884582257,
+    "fpr": 0.0006506180871828237
   },
   "by_profile": {
     "low_and_slow": {
@@ -22,12 +23,12 @@
       "fpr": null
     },
     "social_engineering_assisted": {
-      "tp": 781,
+      "tp": 765,
       "fp": 0,
       "tn": 0,
-      "fn": 0,
+      "fn": 16,
       "precision": 1.0,
-      "recall": 1.0,
+      "recall": 0.9795134443021767,
       "fpr": null
     },
     "high_volume_burst": {
@@ -41,12 +42,13 @@
     },
     "benign_high_activity": {
       "tp": 0,
-      "fp": 0,
-      "tn": 1537,
+      "fp": 1,
+      "tn": 1536,
       "fn": 0,
-      "precision": null,
+      "precision": 0.0,
       "recall": null,
-      "fpr": 0.0
+      "fpr": 0.0006506180871828237
     }
-  }
+  },
+  "threshold": 0.74
 }

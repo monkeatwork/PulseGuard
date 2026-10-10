@@ -5,19 +5,17 @@ weights per DECISIONS.md, "Fusion weights and threshold placement":
 the validation split (tune_fusion_weights.py) — never silently, never
 touching the test split.
 
-Stage A/B operate at the fragment (gap-based-burst) granularity; Stage C
-operates at user-episode granularity (sequence_dataset.py). Fusion happens
-at the EPISODE level — the same granularity Phase 2's industry-baseline
-evaluation used — by aggregating Stage A/B's per-fragment scores for a
-given episode via MAX (if any fragment looked suspicious, the episode is
-at least that suspicious) before combining with Stage C's single score.
+All three stages score the same object -- a session-so-far at one decision
+point (feature_table.py / sequence_dataset.py) -- so fusion is a per-
+decision-point weighted sum. An episode's fused score is the MAX over its
+decision points (episode_eval.py), matching the live rule that the first
+crossing raises the alert. The weights used live are the ones persisted in
+model_registry/operating_point.json, never these defaults.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-import pandas as pd
 
 DEFAULT_WEIGHT_A = 0.25
 DEFAULT_WEIGHT_B = 0.45
@@ -56,13 +54,3 @@ def fuse_scores(
     w = weights.normalized()
     a = normalize_stage_a_score(stage_a_raw_score)
     return w.weight_a * a + w.weight_b * stage_b_calibrated_score + w.weight_c * stage_c_probability
-
-
-def aggregate_fragment_scores_to_episode(
-    fragment_df: pd.DataFrame, episode_col: str, score_col: str
-) -> dict:
-    """MAX aggregation of a fragment-level score column up to episode
-    granularity — see module docstring for why MAX (not mean): any single
-    suspicious fragment should be enough to raise the whole episode's
-    score, matching how a SOC analyst would read a flagged sub-event."""
-    return fragment_df.groupby(episode_col)[score_col].max().to_dict()

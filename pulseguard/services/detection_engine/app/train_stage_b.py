@@ -19,76 +19,63 @@ from pathlib import Path
 
 import pandas as pd
 
-from eval.harness.metrics import breakdown_by_profile, compute_confusion
 from eval.harness.split import assign_split
 from services.detection_engine.app.calibration import calibrate, fit_calibrator, save_calibrator
+from services.detection_engine.app.episode_eval import (
+    THRESHOLD_GRID as DEFAULT_THRESHOLD_GRID,
+    best_f1_threshold,
+    episode_frame,
+    evaluate,
+)
 from services.detection_engine.app.feature_table import build_feature_table, to_model_matrix
 from services.detection_engine.app.stage_a_statistical import STAGE_A_THRESHOLD, stage_a_score
 from services.detection_engine.app.stage_b_xgboost import save_model, train_stage_b
 
 logger = logging.getLogger("pulseguard.detection_engine.train_stage_b")
 
-# Threshold on Stage B's calibrated probability that maximizes F1 on the
-# validation split is computed at train time, not hardcoded -- see
-# DECISIONS.md, "Threshold placement".
-DEFAULT_THRESHOLD_GRID = [i / 100 for i in range(1, 100)]
-
-
-def best_f1_threshold(y_true, calibrated_scores) -> float:
-    best_threshold, best_f1 = 0.5, -1.0
-    for t in DEFAULT_THRESHOLD_GRID:
-        preds = calibrated_scores >= t
-        confusion = compute_confusion(list(y_true), list(preds))
-        precision = confusion.precision or 0.0
-        recall = confusion.recall or 0.0
-        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
-        if f1 > best_f1:
-            best_f1, best_threshold = f1, t
-    return best_threshold
-
 
 def run(events_path: Path, seed: int, model_out: Path, results_dir: Path) -> dict:
+    """Trains on TRAIN-split decision points, calibrates and picks the
+    threshold on VAL-split episodes, reports on TEST-split episodes. Unit and
+    rule: see feature_table.py / episode_eval.py."""
     events_df = pd.read_parquet(events_path)
     table = build_feature_table(events_df)
     table["split"] = table["user_id"].apply(lambda u: assign_split(seed, u))
 
     train_table = table[table["split"] == "train"]
     val_table = table[table["split"] == "val"]
-    test_table = table[table["split"] == "test"]
 
     X_train, y_train = to_model_matrix(train_table), train_table["label_attack"]
     X_val, y_val = to_model_matrix(val_table), val_table["label_attack"]
-    X_test, y_test = to_model_matrix(test_table), test_table["label_attack"]
 
     model = train_stage_b(X_train, y_train, X_val, y_val)
-    raw_val_scores = model.predict_proba(X_val)[:, 1]
-    calibrator = fit_calibrator(raw_val_scores, y_val.to_numpy())
+    calibrator = fit_calibrator(model.predict_proba(X_val)[:, 1], y_val.to_numpy())
 
-    raw_test_scores = model.predict_proba(X_test)[:, 1]
-    calibrated_test_scores = calibrate(calibrator, raw_test_scores)
+    matrix = to_model_matrix(table)
+    table = table.copy()
+    table["stage_b_calibrated"] = calibrate(calibrator, model.predict_proba(matrix)[:, 1])
+    table["stage_a_raw"] = matrix.apply(lambda row: stage_a_score(row.to_dict()), axis=1)
+    table["stage_a_flag"] = (table["stage_a_raw"] > STAGE_A_THRESHOLD).astype(float)
 
-    threshold = best_f1_threshold(y_val.to_numpy(), calibrate(calibrator, raw_val_scores))
-    stage_b_preds = calibrated_test_scores >= threshold
+    episodes = episode_frame(table, seed, ["stage_b_calibrated", "stage_a_raw", "stage_a_flag"])
+    val_ep = episodes[episodes["split"] == "val"]
+    test_ep = episodes[episodes["split"] == "test"]
 
-    stage_a_scores = X_test.apply(lambda row: stage_a_score(row.to_dict()), axis=1)
-    stage_a_preds = stage_a_scores > STAGE_A_THRESHOLD
+    threshold = best_f1_threshold(val_ep["label_attack"], val_ep["stage_b_calibrated"])
+    # Stage A+B "fused so far": positive if either stage fires at any decision point.
+    preds = (test_ep["stage_a_flag"] > 0) | (test_ep["stage_b_calibrated"] >= threshold)
 
-    fused_preds = stage_a_preds | stage_b_preds  # Stage A+B "fused so far" per the plan
-
-    rows = [
-        {"attack_profile": profile, "y_true": bool(t), "y_pred": bool(p)}
-        for profile, t, p in zip(test_table["attack_profile"], y_test, fused_preds)
-    ]
-    confusion = compute_confusion([r["y_true"] for r in rows], [r["y_pred"] for r in rows])
-    breakdown = breakdown_by_profile(rows)
-
-    results = {
-        "split": "test",
-        "n_bursts_evaluated": len(rows),
-        "threshold": threshold,
-        "overall": confusion.as_dict(),
-        "by_profile": breakdown,
-    }
+    results = evaluate(test_ep, preds)
+    results["threshold"] = threshold
+    # Reported alongside the historical "A OR B" rule (never instead of it):
+    # each half on its own, at the same validation-chosen thresholds, so a
+    # reader can see which half any false positive comes from.
+    stage_b_only = evaluate(test_ep, test_ep["stage_b_calibrated"] >= threshold)
+    stage_a_only = evaluate(test_ep, test_ep["stage_a_flag"] > 0)
+    results["stage_b_only"] = {"overall": stage_b_only["overall"], "by_profile": stage_b_only["by_profile"]}
+    results["stage_a_only"] = {"overall": stage_a_only["overall"], "by_profile": stage_a_only["by_profile"]}
+    results["stage_a_threshold"] = STAGE_A_THRESHOLD
+    results["n_decision_points_trained_on"] = int(len(train_table))
 
     model_out.parent.mkdir(parents=True, exist_ok=True)
     save_model(model, model_out)
@@ -97,11 +84,11 @@ def run(events_path: Path, seed: int, model_out: Path, results_dir: Path) -> dic
     results_dir.mkdir(parents=True, exist_ok=True)
     (results_dir / "stage_ab.json").write_text(json.dumps(results, indent=2, default=str))
     logger.info(
-        "Stage A+B: precision=%.3f recall=%.3f fpr=%.3f (n=%d)",
+        "Stage A+B: precision=%.3f recall=%.3f fpr=%.3f (n=%d episodes)",
         results["overall"]["precision"] or 0.0,
         results["overall"]["recall"] or 0.0,
         results["overall"]["fpr"] or 0.0,
-        results["n_bursts_evaluated"],
+        results["n_episodes_evaluated"],
     )
     return results
 

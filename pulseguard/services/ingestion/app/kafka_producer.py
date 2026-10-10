@@ -1,4 +1,4 @@
-"""Kafka/Redpanda producer for canonical PulseGuardEvents (L2 ingestion).
+"""Kafka producer for canonical PulseGuardEvents (L2 ingestion).
 
 Serializes each event to the canonical JSON schema (pulseguard_common.event_schema)
 and produces it to `pulseguard.events.raw`, partitioned by user_id so a
@@ -19,7 +19,7 @@ RAW_EVENTS_TOPIC = "pulseguard.events.raw"
 
 class EventProducer:
     def __init__(self, bootstrap_servers: str | None = None):
-        servers = bootstrap_servers or os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "redpanda:9092")
+        servers = bootstrap_servers or os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
         self._producer = Producer({"bootstrap.servers": servers})
 
     def produce(self, event: PulseGuardEvent) -> None:

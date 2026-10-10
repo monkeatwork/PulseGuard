@@ -34,9 +34,14 @@ def stage_a_score(vector: dict) -> float:
     if deny_run >= 2:
         signals.append(deny_run / 2.0)
 
-    n_prompts = vector.get("n_prompts", 0)
-    if n_prompts > 9:  # matches the Splunk baseline's own threshold as a floor signal
-        signals.append(n_prompts / 9.0)
+    # Matches the Splunk baseline's own threshold (>9 prompts in 10 minutes)
+    # as a floor signal. Reads the 10-minute window count, not n_prompts:
+    # under session-level scoring n_prompts is a whole session's length,
+    # which a benign power user legitimately runs up over a day
+    # (DECISIONS.md 2026-10-11, "Stage A reads the windowed prompt count").
+    in_window = vector.get("prompts_per_window", 0)
+    if in_window > 9:
+        signals.append(in_window / 9.0)
 
     return max(signals)
 

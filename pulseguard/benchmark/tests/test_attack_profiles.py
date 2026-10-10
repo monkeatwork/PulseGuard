@@ -92,18 +92,41 @@ def test_benign_high_activity_hard_negative_has_no_capitulation_signature():
     )
     pairs = _pairs(events)
     assert len(pairs) >= ap.BENIGN_HIGH_ACTIVITY_LOGINS_PER_DAY_RANGE[0]
+    decisions = [d.decision for _, d in pairs]
     for prompt, decision in pairs:
-        assert decision.decision == "approve"
+        assert decision.decision in {"approve", "deny"}
         assert prompt.label_attack is False
         assert decision.attack_profile is None
         # the "attacker" context on the prompt is actually the victim's own
         assert prompt.device_id == VICTIM_DEVICE
         assert prompt.src_ip == VICTIM_IP
-    latencies = [d.decision_latency_ms for _, d in pairs]
+    # a denial is never followed by another denial: no deny run of >= 2
+    for first, second in zip(decisions, decisions[1:]):
+        assert not (first == "deny" and second == "deny")
+    approve_latencies = [d.decision_latency_ms for _, d in pairs if d.decision == "approve"]
     # stationary: no systematic decay across the session (unlike fatigue)
-    first_half = latencies[: len(latencies) // 2]
-    second_half = latencies[len(latencies) // 2 :]
+    first_half = approve_latencies[: len(approve_latencies) // 2]
+    second_half = approve_latencies[len(approve_latencies) // 2 :]
     assert abs(sum(first_half) / len(first_half) - sum(second_half) / len(second_half)) < 3000
+
+
+def test_benign_high_activity_contains_genuine_denials_across_users():
+    """REMEDIATION_TASK.md A3: the high-activity hard negative must be able to
+    contain a denial followed by a legitimate approval, so "any denial" is no
+    longer a free shortcut for separating the classes."""
+    found = 0
+    for i in range(40):
+        rng = child_rng(42, f"poweruser{i}", "benign_high_activity")
+        events = ap.generate_benign_high_activity_session(
+            rng, f"poweruser{i}", START_TS, VICTIM_DEVICE, VICTIM_UA, VICTIM_IP, VICTIM_COUNTRY
+        )
+        decisions = [d.decision for _, d in _pairs(events)]
+        for first, second in zip(decisions, decisions[1:]):
+            if first == "deny":
+                assert second == "approve"
+                found += 1
+        assert all(e.label_attack is False for e in events)
+    assert found > 0
 
 
 def test_benign_occasional_denial_has_exactly_one_denial_then_an_unrelated_approve():
@@ -112,7 +135,9 @@ def test_benign_occasional_denial_has_exactly_one_denial_then_an_unrelated_appro
         rng, "occasional_denier", START_TS, VICTIM_DEVICE, VICTIM_UA, VICTIM_IP, VICTIM_COUNTRY
     )
     pairs = _pairs(events)
-    assert len(pairs) == 2
+    assert 2 <= len(pairs) <= 2 + ap.OCCASIONAL_DENIAL_EXTRA_APPROVALS_RANGE[1] - 1
+    assert [d.decision for _, d in pairs].count("deny") == 1
+    assert all(d.decision == "approve" for _, d in pairs[1:])
     deny_prompt, deny_decision = pairs[0]
     approve_prompt, approve_decision = pairs[1]
     assert deny_decision.decision == "deny"
@@ -140,3 +165,15 @@ def test_deterministic_given_same_seed():
     assert [(e.ts, e.decision, e.decision_latency_ms) for e in events1] == [
         (e.ts, e.decision, e.decision_latency_ms) for e in events2
     ]
+
+
+def test_session_gap_and_buffer_ttl_outlast_low_and_slow_pacing():
+    """REMEDIATION_TASK.md A1 regression guard: a low-and-slow attack's
+    widest inter-prompt gap must fit inside one session, and the live
+    buffer must not expire before the next prompt arrives."""
+    from pulseguard_common.redis_keys import BURST_KEY_TTL_SECONDS
+    from pulseguard_common.sessions import SESSION_GAP_THRESHOLD_SECONDS
+
+    widest_gap = ap.LOW_AND_SLOW_GAP_SECONDS_RANGE[1]
+    assert SESSION_GAP_THRESHOLD_SECONDS > widest_gap
+    assert BURST_KEY_TTL_SECONDS > SESSION_GAP_THRESHOLD_SECONDS

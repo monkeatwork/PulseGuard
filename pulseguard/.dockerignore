@@ -1,0 +1,11 @@
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/node_modules
+**/dist
+**/*.egg-info
+**/build
+data/raw
+data/generated*
+services/detection_engine/app/model_registry/*.pt
+.env
