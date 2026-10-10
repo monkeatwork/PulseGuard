@@ -1,24 +1,28 @@
-"""Database session factory shared by any service that reads/writes
-Postgres directly (currently detection_engine and mitigation's REST APIs).
-Connection parameters come from the same env vars docker-compose.yml sets
-(POSTGRES_HOST/PORT/USER/PASSWORD/DB) — no separate config surface.
+"""Database session factory shared by every service that reads/writes
+Postgres (ingestion, detection_engine, mitigation -- their APIs and their
+background workers). Connection parameters come from the env vars
+docker-compose.yml sets (POSTGRES_HOST/PORT/USER/PASSWORD/DB), or a full
+DATABASE_URL when given.
 """
 
 from __future__ import annotations
 
 import os
+from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 
 def build_database_url() -> str:
+    if os.environ.get("DATABASE_URL"):
+        return os.environ["DATABASE_URL"]
     user = os.environ.get("POSTGRES_USER", "pulseguard")
     password = os.environ.get("POSTGRES_PASSWORD", "pulseguard_dev_password")
     host = os.environ.get("POSTGRES_HOST", "postgres")
     port = os.environ.get("POSTGRES_PORT", "5432")
     db = os.environ.get("POSTGRES_DB", "pulseguard")
-    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{db}"
+    return f"postgresql+psycopg2://{quote_plus(user)}:{quote_plus(password)}@{host}:{port}/{db}"
 
 
 _engine = None

@@ -72,10 +72,10 @@ def test_mitigation_actions_table_round_trips_a_real_row(postgres_container):
     with postgres_container.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO alerts (alert_id, user_id, ts, fused_score)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO alerts (alert_id, user_id, ts, updated_ts, fused_score)
+            VALUES (%s, %s, %s, %s, %s)
             """,
-            (str(alert_id), "user1", now, 0.93),
+            (str(alert_id), "user1", now, now, 0.93),
         )
         cur.execute(
             """

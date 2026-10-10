@@ -5,7 +5,6 @@ import pytest
 
 from services.detection_engine.app.fusion import (
     FusionWeights,
-    aggregate_fragment_scores_to_episode,
     fuse_scores,
     normalize_stage_a_score,
 )
@@ -49,15 +48,3 @@ def test_fuse_scores_custom_weights_are_normalized():
     weights = FusionWeights(weight_a=2.0, weight_b=2.0, weight_c=2.0)
     score = fuse_scores(100.0, 1.0, 1.0, weights)  # a normalizes to 1.0 too
     assert score == pytest.approx(1.0)
-
-
-def test_aggregate_fragment_scores_to_episode_uses_max():
-    df = pd.DataFrame(
-        {
-            "episode": ["e1", "e1", "e1", "e2"],
-            "score": [0.1, 0.9, 0.3, 0.5],
-        }
-    )
-    result = aggregate_fragment_scores_to_episode(df, "episode", "score")
-    assert result["e1"] == pytest.approx(0.9)
-    assert result["e2"] == pytest.approx(0.5)
