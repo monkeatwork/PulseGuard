@@ -1,12 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// In development the API calls go to a running stack's nginx (./run.sh),
+// exactly the same /api/* paths the production build uses.
 export default defineConfig({
   plugins: [react()],
-  server: { host: "0.0.0.0", port: 3000 },
+  build: { chunkSizeWarningLimit: 900 },
+  server: { port: 5173, proxy: { "/api": "http://127.0.0.1:3000" } },
   test: {
     environment: "jsdom",
-    setupFiles: ["./src/test/setup.js"],
     globals: true,
+    setupFiles: "./src/test/setup.js",
   },
 });
