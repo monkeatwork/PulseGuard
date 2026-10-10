@@ -8,7 +8,9 @@ import { usePoll } from "../lib/hooks.js";
 const DETECTORS = [
   { key: "baseline_splunk", label: "Splunk rule", sub: ">9 prompts in 10 min", baseline: true },
   { key: "baseline_elastic", label: "Elastic rule", sub: "2 denials + success in 10 min", baseline: true },
-  { key: "stage_ab", label: "Stage A + B", sub: "statistical + XGBoost" },
+  { key: "stage_ab", label: "Stage A or B", sub: "either stage fires" },
+  { key: "stage_a_only", label: "Stage A alone", sub: "fixed statistical rule" },
+  { key: "stage_b_only", label: "Stage B alone", sub: "XGBoost, calibrated" },
   { key: "stage_c", label: "Stage C", sub: "GRU over the sequence" },
   { key: "full_fusion", label: "PulseGuard fusion", sub: "A + B + C at the operating point", ours: true },
 ];
@@ -31,9 +33,19 @@ function Bar({ value, color = "var(--series-1)", max = 1 }) {
   );
 }
 
+// stage_ab.json also carries each half of "A OR B" on its own; surface them
+// as their own detector rows so a false positive can be traced to its stage.
+function withSubDetectors(r) {
+  if (!r?.stage_ab) return r;
+  const out = { ...r };
+  if (r.stage_ab.stage_a_only) out.stage_a_only = r.stage_ab.stage_a_only;
+  if (r.stage_ab.stage_b_only) out.stage_b_only = r.stage_ab.stage_b_only;
+  return out;
+}
+
 export default function Evaluation() {
   const res = usePoll(() => api.evalResults(), 0);
-  const r = res.data;
+  const r = withSubDetectors(res.data);
   if (res.error) return <ErrorNote error={res.error} />;
   if (!r) return <Card><Empty title="Loading results…" /></Card>;
   if (!r.full_fusion) return <Card><Empty icon={FileText} title="No evaluation results found">Run the offline pipeline (make pipeline).</Empty></Card>;

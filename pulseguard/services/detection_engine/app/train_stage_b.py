@@ -67,6 +67,13 @@ def run(events_path: Path, seed: int, model_out: Path, results_dir: Path) -> dic
 
     results = evaluate(test_ep, preds)
     results["threshold"] = threshold
+    # Reported alongside the historical "A OR B" rule (never instead of it):
+    # each half on its own, at the same validation-chosen thresholds, so a
+    # reader can see which half any false positive comes from.
+    stage_b_only = evaluate(test_ep, test_ep["stage_b_calibrated"] >= threshold)
+    stage_a_only = evaluate(test_ep, test_ep["stage_a_flag"] > 0)
+    results["stage_b_only"] = {"overall": stage_b_only["overall"], "by_profile": stage_b_only["by_profile"]}
+    results["stage_a_only"] = {"overall": stage_a_only["overall"], "by_profile": stage_a_only["by_profile"]}
     results["stage_a_threshold"] = STAGE_A_THRESHOLD
     results["n_decision_points_trained_on"] = int(len(train_table))
 

@@ -22,9 +22,11 @@ data/generated*/
 # claims are measured against — small files, and the whole point is that
 # they're committed evidence, not scratch output.
 
-# Model artifacts
-services/detection_engine/app/model_registry/*
-!services/detection_engine/app/model_registry/.gitkeep
+# Model artifacts: the deployed set IS committed (stage_b.json,
+# stage_b_calibrator.pkl, stage_c.npz, operating_point.json) so a fresh clone
+# runs without retraining. Only the torch checkpoint (training-only, larger)
+# is ignored.
+services/detection_engine/app/model_registry/*.pt
 
 .env
 *.log

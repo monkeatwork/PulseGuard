@@ -72,6 +72,10 @@ def render_headline_comparison(results_dir: Path) -> str:
             continue
         result = load_result(path)
         lines.append(_detector_row(label, result["overall"], result.get(n_key, "n/a")))
+        if filename == "stage_ab.json":
+            for key, sub_label in (("stage_a_only", "  Stage A alone"), ("stage_b_only", "  Stage B alone")):
+                if key in result:
+                    lines.append(_detector_row(sub_label, result[key]["overall"], result.get(n_key, "n/a")))
 
     fusion_path = results_dir / "full_fusion.json"
     if fusion_path.exists():
