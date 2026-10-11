@@ -562,3 +562,11 @@ The CLAUDE.md sentence calling it "the single most important feature in the syst
 - Stage A+B is now reported at episode granularity, where its FPR is 0.633.
 
 None of these was tuned back.
+
+## 2026-10-11 — Windows scripts: quiet docker calls under `$ErrorActionPreference = 'Stop'`
+
+**Decided:** `scripts/windows/common.ps1` gains a `Quiet` helper that runs a native command with its output discarded and the error preference relaxed to `Continue` for that one call. `run.ps1`, `stop.ps1` and `Require-Docker` use it in place of a bare `*> $null`. **Rejected:** dropping `$ErrorActionPreference = 'Stop'` for the whole script (it is what makes a failed cmdlet abort the run), and requiring PowerShell 7 (the launchers call `powershell`, the 5.1 that ships with Windows, so that nothing extra has to be installed). **Why:** Windows PowerShell 5.1 turns redirected stderr lines from a native command into error records, and `Stop` makes the first one fatal. `docker compose down` writes its progress to stderr, so the first `.\run` after `.\config-everything` (which leaves the self-test's volume and network behind), and every `.\run` over a live stack, died at "Clearing any previous run" with `NativeCommandError` even though the cleanup succeeded. The same pattern in `Require-Docker` replaced the "Docker is installed but not running" message with that raw error. Found on a clean Windows 11 install.
+
+## 2026-10-11 — Kafka healthcheck
+
+**Decided:** the `kafka` service gets a healthcheck that probes the client listener with `nc -z 127.0.0.1 9092`. **Rejected:** a metadata request through `kafka-topics.sh` or `kafka-broker-api-versions.sh` (the `apache/kafka-native` image ships only the broker binary, no CLI tools), and leaving it unchecked. **Why:** it was the only long-running service without one, so `docker compose ps` never showed it as `(healthy)` and `up --wait` could only wait for it to be running. This is a port probe, not proof the broker serves requests; `kafka-init`, which must create the topics before any service starts, remains the functional check.

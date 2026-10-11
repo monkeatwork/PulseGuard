@@ -5,7 +5,7 @@
 Require-Docker
 
 Say 'Clearing any previous run'
-& docker compose @ComposeFiles down --volumes --remove-orphans *> $null
+Quiet docker compose @ComposeFiles down --volumes --remove-orphans
 
 Say 'Starting PulseGuard (fresh database, fresh Kafka, fresh baselines)'
 try {

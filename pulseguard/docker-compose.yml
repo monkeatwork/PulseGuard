@@ -80,6 +80,12 @@ services:
       KAFKA_LOG_RETENTION_HOURS: 24
       KAFKA_HEAP_OPTS: -Xmx192m -Xms64m
     mem_limit: 384m
+    healthcheck:
+      # The native image ships no Kafka CLI tools, so probe the client listener.
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9092"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
 
   kafka-init:
     # One-shot: creates the topics with explicit partition counts, then exits.

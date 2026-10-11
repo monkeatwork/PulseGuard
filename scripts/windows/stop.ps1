@@ -6,5 +6,5 @@ Require-Docker
 Say 'Stopping PulseGuard'
 Compose down --volumes --remove-orphans
 $left = docker ps -a --filter label=com.docker.compose.project=pulseguard -q
-if ($left) { docker rm -f $left *> $null }
+if ($left) { Quiet docker rm -f @left }
 Ok 'All PulseGuard containers, networks and volumes are gone.'

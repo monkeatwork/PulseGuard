@@ -20,13 +20,24 @@ function Compose {
   if ($LASTEXITCODE -ne 0) { throw "docker compose $($args -join ' ') failed (exit $LASTEXITCODE)" }
 }
 
+# Runs a native command with all of its output discarded; check $LASTEXITCODE
+# afterwards. Windows PowerShell 5.1 turns redirected stderr lines into error
+# records, which 'Stop' makes fatal even when the command succeeded (docker
+# writes its progress to stderr), so the preference is relaxed inside here.
+function Quiet {
+  $ErrorActionPreference = 'Continue'
+  $cmd = $args[0]
+  $rest = @($args | Select-Object -Skip 1)  # always an array: splatting a lone string splits it into characters
+  & $cmd @rest *> $null
+}
+
 function Require-Docker {
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Die 'Docker is not installed. Install Docker Desktop: https://docs.docker.com/desktop/install/windows-install/'
   }
-  docker info *> $null
+  Quiet docker info
   if ($LASTEXITCODE -ne 0) { Die 'Docker is installed but not running. Start Docker Desktop, wait for "Engine running", then try again.' }
-  docker compose version *> $null
+  Quiet docker compose version
   if ($LASTEXITCODE -ne 0) { Die 'Docker Compose v2 is missing (it ships with Docker Desktop).' }
 }
 
