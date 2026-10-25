@@ -1,0 +1,3 @@
+.DS_Store
+# scratch copies of committed results used for reproduction checks
+.repro/

@@ -27,7 +27,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import torch
 
 from benchmark.baselines import elastic_rule, splunk_rule
 from eval.adversarial.mimicry_attacker import compute_historical_gaps, generate_mimicry_attack
