@@ -148,6 +148,7 @@ def build_corpus(
     seed: int,
     users: dict[str, list[dict]],
     fatigue: FatigueConfig = DEFAULT_FATIGUE,
+    hard_negatives: ap.HardNegativeConfig = ap.DEFAULT_HARD_NEGATIVES,
 ) -> tuple[list[dict], dict[str, int]]:
     records: list[dict] = []
     profile_counts: dict[str, int] = {name: 0 for _, name in PROFILE_BUCKETS}
@@ -190,7 +191,9 @@ def build_corpus(
             )
         elif profile == "benign_high_activity":
             burst = ap.generate_benign_high_activity_session(
-                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country, **kw
+                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country, **kw,
+                hard_negatives=hard_negatives,
+                deny_run_rng=child_rng(seed, user_id, "deny_run") if hard_negatives.deny_run_rate > 0 else None,
             )
         elif profile == "benign_occasional_denial":
             burst = ap.generate_benign_occasional_denial_session(
@@ -251,6 +254,7 @@ def run(
     out_dir: Path,
     max_rows_scanned: int = DEFAULT_MAX_ROWS_SCANNED,
     fatigue: FatigueConfig = DEFAULT_FATIGUE,
+    hard_negatives: ap.HardNegativeConfig = ap.DEFAULT_HARD_NEGATIVES,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -266,7 +270,7 @@ def run(
             len(users),
         )
 
-    records, profile_counts = build_corpus(seed, users, fatigue)
+    records, profile_counts = build_corpus(seed, users, fatigue, hard_negatives)
     df = finalize_records(records, seed)
 
     events_path = out_dir / "events.parquet"
@@ -279,6 +283,7 @@ def run(
         "rows_scanned": rows_scanned,
         "profile_counts": profile_counts,
         "fatigue": fatigue.as_dict(),
+        "hard_negatives": hard_negatives.as_dict(),
         "total_events": len(df),
         "events_sha256": _sha256_of_file(events_path),
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -307,6 +312,8 @@ def _cli() -> int:
     parser.add_argument("--benign-latency", choices=BENIGN_SOURCES, default=DEFAULT_FATIGUE.benign_source)
     parser.add_argument("--fatigue-heterogeneity", type=float, default=DEFAULT_FATIGUE.heterogeneity,
                         help="std of a per-episode multiplier on --fatigue-strength")
+    parser.add_argument("--benign-deny-run-rate", type=float, default=0.0,
+                        help="share of benign high-activity logins preceded by 2-4 denied prompts (0 = original corpus)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -328,7 +335,8 @@ def _cli() -> int:
             benign_source=args.benign_latency,
             heterogeneity=args.fatigue_heterogeneity,
         )
-        run(args.seed, args.scale, rba_zip, Path(args.out), args.max_rows_scanned, fatigue)
+        hard_negatives = ap.HardNegativeConfig(deny_run_rate=args.benign_deny_run_rate)
+        run(args.seed, args.scale, rba_zip, Path(args.out), args.max_rows_scanned, fatigue, hard_negatives)
     except RbaFetchError as exc:
         logger.error("Generator halted: %s", exc)
         return 1

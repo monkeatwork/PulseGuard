@@ -35,6 +35,7 @@ import sys
 import time
 from pathlib import Path
 
+from benchmark.generator.attack_profiles import DEFAULT_HARD_NEGATIVES, HardNegativeConfig
 from benchmark.generator.latency_models import (
     BENIGN_SOURCES,
     FATIGUE_SHAPES,
@@ -55,13 +56,16 @@ GRID_DETECTORS = ("isolation_forest", "logistic_regression", "frequency_only", "
 METRICS = ("precision", "recall", "fpr")
 
 
-def run_seed(users, seed: int, base: FatigueConfig, strengths, gru_epochs: int, grid: bool) -> dict:
+def run_seed(
+    users, seed: int, base: FatigueConfig, strengths, gru_epochs: int, grid: bool,
+    hard_negatives: HardNegativeConfig = DEFAULT_HARD_NEGATIVES,
+) -> dict:
     views, suites = {}, {}
     runs = {}
     for s in strengths:
         t0 = time.time()
         config = base.with_strength(s)
-        events = build_events(users, seed, config)
+        events = build_events(users, seed, config, hard_negatives)
         view = prepare(events, seed)
         suite = train_suite(view, seed, gru_epochs)
         points = score_points(suite, view)
@@ -189,6 +193,8 @@ def main(argv=None) -> int:
     parser.add_argument("--fatigue-shape", choices=FATIGUE_SHAPES, default="linear")
     parser.add_argument("--benign-latency", choices=BENIGN_SOURCES, default="legacy")
     parser.add_argument("--fatigue-heterogeneity", type=float, default=0.0)
+    parser.add_argument("--benign-deny-run-rate", type=float, default=0.0,
+                        help="share of benign high-activity logins preceded by 2-4 denials (0 = original corpus)")
     parser.add_argument("--gru-epochs", type=int, default=None, help="default: train_stage_c.EPOCHS")
     parser.add_argument("--no-grid", action="store_true", help="skip the train/test strength grid")
     parser.add_argument("--out", default="eval/results/fatigue_sweep.json")
@@ -203,18 +209,24 @@ def main(argv=None) -> int:
     from services.detection_engine.app.train_stage_c import EPOCHS
 
     base = FatigueConfig(1.0, args.fatigue_shape, args.fatigue_null, args.benign_latency, args.fatigue_heterogeneity)
+    hard_negatives = HardNegativeConfig(deny_run_rate=args.benign_deny_run_rate)
     out_path = Path(args.out)
     # Resumable: a seed already in the output file is not re-run.
     previous = json.loads(out_path.read_text()) if out_path.exists() else {}
-    same_setup = previous.get("config", {}).get("base_fatigue") == base.as_dict() and previous.get("config", {}).get(
-        "strengths"
-    ) == args.strengths and previous.get("config", {}).get("scale") == args.scale
+    prev_cfg = previous.get("config", {})
+    same_setup = (
+        prev_cfg.get("base_fatigue") == base.as_dict()
+        and prev_cfg.get("strengths") == args.strengths
+        and prev_cfg.get("scale") == args.scale
+        and prev_cfg.get("hard_negatives", DEFAULT_HARD_NEGATIVES.as_dict()) == hard_negatives.as_dict()
+    )
     per_seed = previous.get("per_seed", {}) if same_setup else {}
 
     def write() -> None:
         result = {
             "config": {
                 "base_fatigue": base.as_dict(),
+                "hard_negatives": hard_negatives.as_dict(),
                 "strengths": args.strengths,
                 "scale": args.scale,
                 "seeds": list(per_seed),
@@ -232,6 +244,7 @@ def main(argv=None) -> int:
         if args.plot:
             title = (
                 f"Fatigue sweep: null={base.null_model}, shape={base.shape}, benign={base.benign_source}, "
+                f"benign deny-run rate={hard_negatives.deny_run_rate:g}, "
                 f"seeds={len(per_seed)}, {args.scale:,} users"
             )
             plot(result["summary"], result["grid_summary"], Path(args.plot), title)
@@ -242,7 +255,8 @@ def main(argv=None) -> int:
         for part in map(Path, args.merge):
             data = json.loads(part.read_text())
             cfg = data["config"]
-            if (cfg["base_fatigue"], cfg["strengths"], cfg["scale"]) != (base.as_dict(), args.strengths, args.scale):
+            setup = (cfg["base_fatigue"], cfg["strengths"], cfg["scale"], cfg.get("hard_negatives", DEFAULT_HARD_NEGATIVES.as_dict()))
+            if setup != (base.as_dict(), args.strengths, args.scale, hard_negatives.as_dict()):
                 raise SystemExit(f"{part}: different sweep setup, refusing to merge")
             per_seed.update(data["per_seed"])
         write()
@@ -253,7 +267,9 @@ def main(argv=None) -> int:
         if str(seed) in per_seed:
             logger.info("seed %d already in %s, skipping", seed, out_path)
             continue
-        per_seed[str(seed)] = run_seed(users, seed, base, args.strengths, args.gru_epochs or EPOCHS, not args.no_grid)
+        per_seed[str(seed)] = run_seed(
+            users, seed, base, args.strengths, args.gru_epochs or EPOCHS, not args.no_grid, hard_negatives
+        )
         write()
     return 0
 

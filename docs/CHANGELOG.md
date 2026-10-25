@@ -40,3 +40,20 @@ One entry per working iteration: what changed, why, files touched, known issues,
 - Early sweep results (seed 42): with the matched null at s = 0 (no latency signal at all) PulseGuard still reaches recall 0.994 at FPR 0.002, so latency contributes little on this benchmark.
 
 **Next step:** finish the 5-seed sweep, the legacy sweep, the adaptive attacker and the robustness runs; regenerate the report.
+
+## 2026-10-26 — Iteration 3: adaptive attacker results (task 3); opt-in benign deny runs
+
+**What changed**
+- `eval/results/adaptive_attacker.json/.png`: 72 settings (9 gaps x usual hours on/off x lure on/off x 2 victim models), 400 test-split victims each. PulseGuard keeps recall >= 0.985 up to 1-hour gaps without a lure, then drops to 0 at 2 h and beyond: once the gap passes the 60-minute session boundary every prompt is its own session. Elastic is at 0 from 10-minute gaps, Splunk from 2 minutes. The windowless two-denials rule stays at 1.0 at every gap. The anti-lockout invariant holds at all 72 settings.
+- Generator: opt-in `--benign-deny-run-rate r` (`HardNegativeConfig`): a share r of benign high-activity logins is preceded by 2-4 denied prompts. Default 0 keeps the corpus unchanged (golden hash). A small-scale check at r = 0.1 gives the two-denials rule and Elastic FPR 0.38 while PulseGuard stays at 0.03.
+- Report section for the hard-negative sweep.
+
+**Why:** task 3, and removing the "two denials" shortcut so the benchmark can measure whether response latency adds anything.
+
+**Files touched:** `pulseguard/eval/results/adaptive_attacker.{json,png}`, `pulseguard/eval/research/{adaptive_attacker,fatigue_sweep,corpora,report}.py`, `pulseguard/benchmark/generator/{attack_profiles,cli}.py`, `pulseguard/benchmark/tests/test_generator_determinism.py`, `pulseguard/DECISIONS.md`.
+
+**Known issues**
+- Session-level scoring has a hard horizon: an attacker pacing prompts more than an hour apart is invisible to PulseGuard. A cross-session deny counter (per user, over days) is the obvious fix and is not built.
+- The benign deny-run rate is an assumption; it is swept, not measured.
+
+**Next step:** 5-seed sweep, legacy sweep, robustness and hard-negative sweeps (queued), then the report.

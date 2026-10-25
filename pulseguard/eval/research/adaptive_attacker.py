@@ -273,9 +273,9 @@ def plot(results: dict, out_path: Path) -> None:
                 label = name if det != "pulseguard" else f"{name} ({'no latency signal' if dash == '--' else 'default victim'})"
                 ax.plot(gaps, ys, dash, marker=marker, color=colour, label=label, markersize=4, linewidth=1.5)
         ax.axvline(60, color="#555", linewidth=0.8, linestyle=":")
-        ax.text(62, 0.02, "session gap\n(60 min)", fontsize=7, color="#555")
+        ax.text(66, 0.45, "session gap\n(60 min)", fontsize=7, color="#555")
         ax.set_xscale("log")
-        ax.set_xticks([1, 2, 5, 10, 20, 40, 60, 120, 240], ["1m", "2m", "5m", "10m", "20m", "40m", "1h", "2h", "4h"])
+        ax.set_xticks([1, 2, 5, 10, 20, 60, 120, 240], ["1m", "2m", "5m", "10m", "20m", "1h", "2h", "4h"])
         ax.set_xlabel("Gap between prompts")
         ax.set_title(f"usual hours {'on' if usual else 'off'}, lure {'on' if lure else 'off'}", fontsize=10)
         ax.set_ylim(-0.02, 1.02)

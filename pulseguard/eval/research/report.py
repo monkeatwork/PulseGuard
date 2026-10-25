@@ -226,6 +226,47 @@ def robustness_section(rob: dict) -> list[str]:
     return lines
 
 
+def hard_negative_section(files: list[dict]) -> list[str]:
+    """One sweep per benign deny-run rate (fatigue_sweep --benign-deny-run-rate)."""
+    files = sorted(files, key=lambda d: d["config"]["hard_negatives"]["deny_run_rate"])
+    dets = ("deny_run_rule", "elastic", "logistic_regression", "frequency_only", "pulseguard")
+    lines = [
+        "## Benign users who deny several prompts in a row",
+        "",
+        "In the default corpus no benign episode ever has two consecutive denials, so a one-line rule separates the "
+        "classes. Here a share r of benign high-activity logins is preceded by 2-4 denied prompts (benign denial "
+        "latency, own device). r is an assumption, so it is swept. Each cell: recall / FPR, seed "
+        f"{', '.join(files[0]['config']['seeds'])}, matched null.",
+        "",
+        "| r | s | " + " | ".join(DETECTOR_NAMES[d] for d in dets) + " |",
+        "|---|---|" + "---|" * len(dets),
+    ]
+    for data in files:
+        r = data["config"]["hard_negatives"]["deny_run_rate"]
+        for s, cells in data["summary"].items():
+            lines.append(
+                f"| {r:g} | {float(s):g} | "
+                + " | ".join(f"{_f(cells[d]['recall']['mean'])} / {_f(cells[d]['fpr']['mean'], 4)}" for d in dets)
+                + " |"
+            )
+    lines.append("")
+    # Does the latency signal start to matter once deny runs stop being free?
+    for data in files:
+        summ = data["summary"]
+        keys = list(summ)
+        lo, hi = summ[keys[0]]["pulseguard"], summ[keys[-1]]["pulseguard"]
+        r = data["config"]["hard_negatives"]["deny_run_rate"]
+        d_fpr = (lo["fpr"]["mean"] or 0) - (hi["fpr"]["mean"] or 0)
+        d_rec = (hi["recall"]["mean"] or 0) - (lo["recall"]["mean"] or 0)
+        verdict = "matters" if d_fpr > NOISE_FLOOR / 10 or d_rec > NOISE_FLOOR else "does not measurably matter"
+        lines.append(
+            f"- r = {r:g}: from s = {float(keys[0]):g} to s = {float(keys[-1]):g}, PulseGuard recall changes by "
+            f"{d_rec:+.3f} and FPR by {-d_fpr:+.4f}: the latency signal {verdict}."
+        )
+    lines.append("")
+    return lines
+
+
 def build_research_sections(results_dir: Path) -> str:
     parts: list[str] = ["", "# Research extensions (HANDOFF.md tasks 1-4)", ""]
     for name, fn in (
@@ -247,4 +288,7 @@ def build_research_sections(results_dir: Path) -> str:
             parts += section
         else:
             parts += fn(data)
+    hard = [json.loads(p.read_text()) for p in sorted(results_dir.glob("hard_negatives_r*.json"))]
+    if hard:
+        parts += hard_negative_section(hard)
     return "\n".join(parts)

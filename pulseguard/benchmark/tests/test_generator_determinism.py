@@ -141,3 +141,28 @@ def test_fatigue_strength_changes_attack_latencies_only():
 def test_non_default_fatigue_config_is_still_deterministic():
     config = FatigueConfig(strength=0.5, shape="exponential", null_model="matched", heterogeneity=0.3)
     assert _df_hash(_corpus(config, 60)) == _df_hash(_corpus(config, 60))
+
+
+def _max_benign_deny_run(df: pd.DataFrame) -> int:
+    d = df[(df["event_type"] == "mfa_decision") & ~df["label_attack"].astype(bool)].sort_values(["burst_id", "ts"])
+    best = 0
+    for _, g in d.groupby("burst_id"):
+        run = 0
+        for decision in g["decision"]:
+            run = run + 1 if decision == "deny" else 0
+            best = max(best, run)
+    return best
+
+
+def test_benign_deny_runs_are_opt_in_and_leave_attacks_untouched():
+    from benchmark.generator.attack_profiles import HardNegativeConfig
+
+    base = _corpus()
+    records, _ = build_corpus(42, _fake_users(300), FatigueConfig(), HardNegativeConfig(deny_run_rate=0.5))
+    with_runs = finalize_records(records, seed=42)
+    assert _max_benign_deny_run(base) <= 1  # the original corpus: never two in a row
+    assert _max_benign_deny_run(with_runs) >= 2
+    attack = lambda df: df[df["label_attack"].astype(bool)].drop(columns=["event_id"]).reset_index(drop=True)  # noqa: E731
+    pd.testing.assert_frame_equal(attack(base), attack(with_runs))
+    records, _ = build_corpus(42, _fake_users(300), FatigueConfig(), HardNegativeConfig(deny_run_rate=0.0))
+    assert _df_hash(finalize_records(records, seed=42)) == GOLDEN_DEFAULT_CORPUS_HASH

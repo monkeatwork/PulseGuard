@@ -21,6 +21,7 @@ from pathlib import Path
 import pandas as pd
 
 from benchmark.generator.cli import DEFAULT_MAX_ROWS_SCANNED, build_corpus, collect_benign_users, finalize_records
+from benchmark.generator.attack_profiles import DEFAULT_HARD_NEGATIVES, HardNegativeConfig
 from benchmark.generator.latency_models import FatigueConfig
 
 logger = logging.getLogger("pulseguard.eval.research.corpora")
@@ -41,11 +42,16 @@ def load_users(rba_zip: Path, scale: int, cache_dir: Path = CACHE_DIR) -> dict[s
     return users
 
 
-def build_events(users: dict[str, list[dict]], seed: int, fatigue: FatigueConfig) -> pd.DataFrame:
+def build_events(
+    users: dict[str, list[dict]],
+    seed: int,
+    fatigue: FatigueConfig,
+    hard_negatives: HardNegativeConfig = DEFAULT_HARD_NEGATIVES,
+) -> pd.DataFrame:
     """The corpus as the pipeline sees it: written to parquet and read back
     (a round trip changes dtypes, e.g. None -> NaN in attack_profile), but in
     memory instead of on disk."""
-    records, _ = build_corpus(seed, copy.deepcopy(users), fatigue)
+    records, _ = build_corpus(seed, copy.deepcopy(users), fatigue, hard_negatives)
     buffer = io.BytesIO()
     finalize_records(records, seed).to_parquet(buffer, index=False)
     buffer.seek(0)

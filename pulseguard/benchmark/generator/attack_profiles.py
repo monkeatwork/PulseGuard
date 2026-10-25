@@ -74,6 +74,31 @@ BENIGN_RETRY_GAP_SECONDS_RANGE = (10, 120)  # user re-initiates the login
 
 FINAL_CAPITULATION_APPROVE_PROBABILITY = 0.85  # attack "succeeds" most of the time
 
+# Benign deny RUNS (opt-in; DECISIONS.md 2026-10-26 "Benign deny runs"). With
+# the defaults no benign episode ever denies twice in a row, while almost
+# every attack does, so "two consecutive denials" alone separates the
+# classes. A legitimate user can deny several prompts in a row too: prompts
+# from a stale session or background token refresh they do not recognise,
+# declined until they start a login of their own. How often that happens is
+# not published anywhere, so the rate is a parameter to sweep, not a fact.
+BENIGN_DENY_RUN_LENGTH_RANGE = (2, 5)  # 2-4 consecutive denials
+BENIGN_DENY_RUN_GAP_SECONDS_RANGE = (15, 120)
+
+
+@dataclass(frozen=True)
+class HardNegativeConfig:
+    """deny_run_rate: probability that a benign high-activity login is
+    preceded by a run of 2-4 denied prompts. 0 (the default) generates the
+    original corpus."""
+
+    deny_run_rate: float = 0.0
+
+    def as_dict(self) -> dict:
+        return {"deny_run_rate": self.deny_run_rate}
+
+
+DEFAULT_HARD_NEGATIVES = HardNegativeConfig()
+
 
 def _rng_uuid(rng: np.random.Generator) -> uuid.UUID:
     """Deterministic UUID draw from an rng, given a fixed seed. `rng.bytes`
@@ -327,6 +352,8 @@ def generate_benign_high_activity_session(
     *,
     fatigue: FatigueConfig = DEFAULT_FATIGUE,
     strength: float | None = None,
+    hard_negatives: HardNegativeConfig = DEFAULT_HARD_NEGATIVES,
+    deny_run_rng: np.random.Generator | None = None,
 ) -> list[RawEvent]:
     """Hard negative: a legitimate power user authenticating many times a
     day. Latency stays stationary (drawn from the same benign distribution
@@ -335,7 +362,12 @@ def generate_benign_high_activity_session(
     then re-attempted and approved (BENIGN_HIGH_ACTIVITY_DENIAL_PROBABILITY).
     A lone deny -> approve never reaches MIN_DENIALS_FOR_CAPITULATION, and it
     carries no fatigue coupling: the retry approval uses the ordinary benign
-    approve latency."""
+    approve latency.
+
+    With hard_negatives.deny_run_rate > 0, a login may also be preceded by a
+    run of 2-4 denied prompts (BENIGN_DENY_RUN_*). Those draws come from
+    `deny_run_rng` only, a separate stream, so every other draw in the
+    session is unchanged and corpora stay paired across rates."""
     n = int(rng.integers(*BENIGN_HIGH_ACTIVITY_LOGINS_PER_DAY_RANGE))
     events: list[RawEvent] = []
     ts = day_start_ts
@@ -360,6 +392,12 @@ def generate_benign_high_activity_session(
 
     for _ in range(n):
         session_id = str(_rng_uuid(rng))
+        if deny_run_rng is not None and deny_run_rng.random() < hard_negatives.deny_run_rate:
+            for _ in range(int(deny_run_rng.integers(*BENIGN_DENY_RUN_LENGTH_RANGE))):
+                deny_latency = sample_benign_deny_latency_ms(deny_run_rng, fatigue.benign_source)
+                events.extend(_own_prompt(ts, "deny", deny_latency, session_id))
+                gap = int(deny_run_rng.integers(*BENIGN_DENY_RUN_GAP_SECONDS_RANGE))
+                ts = ts + timedelta(milliseconds=deny_latency) + timedelta(seconds=gap)
         if rng.random() < BENIGN_HIGH_ACTIVITY_DENIAL_PROBABILITY:
             deny_latency = sample_benign_deny_latency_ms(rng, fatigue.benign_source)
             events.extend(_own_prompt(ts, "deny", deny_latency, session_id))
