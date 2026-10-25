@@ -57,9 +57,26 @@ SCORE_COLUMNS = {
     "pulseguard": "fused",
 }
 
+DENY_RUN_RULE_LENGTH = 2
+
+
+def deny_run_rule(events: list[dict]) -> bool:
+    """Research baseline, not an industry rule: fires on the second
+    consecutive denial. Nothing in the generated benchmark's benign profiles
+    ever denies twice in a row, so this one-line rule measures how much of
+    any detector's score that property of the benchmark alone explains."""
+    run = 0
+    for e in sorted((e for e in events if e["event_type"] == "mfa_decision"), key=lambda e: e["ts"]):
+        run = run + 1 if e["decision"] == "deny" else 0
+        if run >= DENY_RUN_RULE_LENGTH:
+            return True
+    return False
+
+
 RULES: dict[str, Callable[[list[dict]], bool]] = {
     "splunk": splunk_rule.evaluate_burst,
     "elastic": elastic_rule.evaluate_burst,
+    "deny_run_rule": deny_run_rule,
 }
 
 

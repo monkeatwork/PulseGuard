@@ -49,7 +49,7 @@ logger = logging.getLogger("pulseguard.eval.research.fatigue_sweep")
 
 DEFAULT_STRENGTHS = (0.0, 0.25, 0.5, 0.75, 1.0)
 REPORTED = (
-    "splunk", "elastic", "isolation_forest", "logistic_regression", "frequency_only", "stage_b", "stage_c", "pulseguard",
+    "splunk", "elastic", "deny_run_rule", "isolation_forest", "logistic_regression", "frequency_only", "stage_b", "stage_c", "pulseguard",
 )
 GRID_DETECTORS = ("isolation_forest", "logistic_regression", "frequency_only", "stage_b", "stage_c", "pulseguard")
 METRICS = ("precision", "recall", "fpr")
@@ -133,6 +133,7 @@ def plot(summary: dict, grid: dict, out_path: Path, title: str) -> None:
         "splunk": ("Splunk (>9 / 10 min)", "#8c8c8c", "s"),
         "elastic": ("Elastic (2 deny + approve)", "#e08a2c", "^"),
         "isolation_forest": ("Isolation Forest", "#59a14f", "v"),
+        "deny_run_rule": ("2 consecutive denials (one-line rule)", "#222222", "x"),
         "frequency_only": ("Frequency features only", "#4c78a8", "o"),
         "pulseguard": ("PulseGuard (full fusion)", "#c23b5a", "D"),
     }
@@ -192,6 +193,8 @@ def main(argv=None) -> int:
     parser.add_argument("--no-grid", action="store_true", help="skip the train/test strength grid")
     parser.add_argument("--out", default="eval/results/fatigue_sweep.json")
     parser.add_argument("--plot", default=None)
+    parser.add_argument("--merge", nargs="+", default=None,
+                        help="combine the per-seed results of these sweep JSONs (same setup) into --out")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     for noisy in ("pulseguard.detection_engine.train_stage_c",):
@@ -208,12 +211,7 @@ def main(argv=None) -> int:
     ) == args.strengths and previous.get("config", {}).get("scale") == args.scale
     per_seed = previous.get("per_seed", {}) if same_setup else {}
 
-    users = load_users(Path(args.rba_zip), args.scale)
-    for seed in args.seeds:
-        if str(seed) in per_seed:
-            logger.info("seed %d already in %s, skipping", seed, out_path)
-            continue
-        per_seed[str(seed)] = run_seed(users, seed, base, args.strengths, args.gru_epochs or EPOCHS, not args.no_grid)
+    def write() -> None:
         result = {
             "config": {
                 "base_fatigue": base.as_dict(),
@@ -237,6 +235,26 @@ def main(argv=None) -> int:
                 f"seeds={len(per_seed)}, {args.scale:,} users"
             )
             plot(result["summary"], result["grid_summary"], Path(args.plot), title)
+
+    if args.merge:
+        # Seeds run as separate processes, combined here. Every part must
+        # come from the same setup, or the summary would average unlike runs.
+        for part in map(Path, args.merge):
+            data = json.loads(part.read_text())
+            cfg = data["config"]
+            if (cfg["base_fatigue"], cfg["strengths"], cfg["scale"]) != (base.as_dict(), args.strengths, args.scale):
+                raise SystemExit(f"{part}: different sweep setup, refusing to merge")
+            per_seed.update(data["per_seed"])
+        write()
+        return 0
+
+    users = load_users(Path(args.rba_zip), args.scale)
+    for seed in args.seeds:
+        if str(seed) in per_seed:
+            logger.info("seed %d already in %s, skipping", seed, out_path)
+            continue
+        per_seed[str(seed)] = run_seed(users, seed, base, args.strengths, args.gru_epochs or EPOCHS, not args.no_grid)
+        write()
     return 0
 
 

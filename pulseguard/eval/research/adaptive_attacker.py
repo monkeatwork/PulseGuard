@@ -260,6 +260,7 @@ def plot(results: dict, out_path: Path) -> None:
     styles = {
         "splunk": ("Splunk", "#8c8c8c", "s"),
         "elastic": ("Elastic", "#e08a2c", "^"),
+        "deny_run_rule": ("2 consecutive denials", "#222222", "x"),
         "pulseguard": ("PulseGuard", "#c23b5a", "D"),
     }
     fig, axes = plt.subplots(1, 4, figsize=(16, 3.8), sharey=True)

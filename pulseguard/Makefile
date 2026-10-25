@@ -9,7 +9,7 @@ SCALE ?= 50000
 EVENTS := data/generated/events.parquet
 MODELS := services/detection_engine/app/model_registry
 
-.PHONY: data generate baselines train evaluate report demo pipeline test
+.PHONY: data generate baselines train evaluate report demo pipeline test research
 
 # Fetches the Wiefling RBA dataset from Zenodo (record 10.5281/zenodo.6782156).
 # Idempotent; no synthetic fallback -- a failed fetch halts (DECISIONS.md).
@@ -32,13 +32,25 @@ evaluate:
 	$(PY) -m eval.ablation.run_ablation --events $(EVENTS) --seed $(SEED)
 	$(PY) -m eval.adversarial.run_adversarial_eval --events $(EVENTS) --seed $(SEED)
 
+# The frozen harness report, then the research sections (eval/research/report.py),
+# each generated from eval/results/*.json only.
 report:
-	$(PY) -c "from pathlib import Path; from eval.harness.report import build_final_report; Path('eval/results/final_report.md').write_text(build_final_report(Path('eval/results')) + '\n')"
+	$(PY) -c "from pathlib import Path; from eval.harness.report import build_final_report; from eval.research.report import build_research_sections; r = Path('eval/results'); r.joinpath('final_report.md').write_text(build_final_report(r) + '\n' + build_research_sections(r) + '\n')"
 
 # Small labelled slice of the TEST split shipped with the repo, so the live
 # demo never needs the 1.1 GB dataset.
 demo:
 	$(PY) -m benchmark.generator.demo_slice --events $(EVENTS) --seed $(SEED) --out data/demo/demo_events.parquet
+
+# Research experiments (HANDOFF.md tasks 1-4; DECISIONS.md 2026-10-26). They train
+# in memory and never touch model_registry/. Hours at full scale: lower SCALE to try.
+SEEDS ?= 42 1 2 3 4
+research: data
+	$(PY) -m eval.research.fatigue_sweep --scale $(SCALE) --seeds $(SEEDS) --out eval/results/fatigue_sweep.json --plot eval/results/fatigue_sweep.png
+	$(PY) -m eval.research.fatigue_sweep --scale $(SCALE) --seeds $(SEED) --fatigue-null legacy --no-grid --out eval/results/fatigue_sweep_legacy.json --plot eval/results/fatigue_sweep_legacy.png
+	$(PY) -m eval.research.before_capitulation --scale $(SCALE) --seed $(SEED) --strengths 1.0 --out eval/results/before_capitulation.json
+	$(PY) -m eval.research.adaptive_attacker --scale $(SCALE) --seed $(SEED) --out eval/results/adaptive_attacker.json --plot eval/results/adaptive_attacker.png
+	$(PY) -m eval.research.robustness --scale $(SCALE) --seed $(SEED) --out eval/results/robustness.json
 
 pipeline: generate baselines train evaluate report demo
 

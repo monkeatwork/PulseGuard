@@ -116,3 +116,11 @@ def test_across_seeds_interval_is_clipped_to_rates():
     s = across_seeds([1.0, 0.98, 1.0])
     assert s["n_seeds"] == 3 and s["ci_high"] <= 1.0 and s["ci_low"] < s["mean"]
     assert across_seeds([None])["mean"] is None
+
+
+def test_deny_run_rule_needs_two_consecutive_denials():
+    from eval.research.suite import deny_run_rule
+
+    assert deny_run_rule(_episode(["deny", "deny", "approve"]))
+    assert not deny_run_rule(_episode(["deny", "approve", "deny", "approve"]))
+    assert not deny_run_rule(_episode(["approve"] * 5))

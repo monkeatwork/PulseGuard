@@ -140,7 +140,7 @@ def run(events_df: pd.DataFrame, seed: int, gru_epochs: int | None = None) -> di
     points = score_points(suite, view)
     models = [d for d in REPORTED_MODELS if d in all_score_columns(suite)]
     rows = analyse(events_df, points, models)
-    detectors = ["splunk", "elastic", *models]
+    detectors = [*RULES, *models]
     out = summarize(rows, detectors)
     out["operating_point"] = suite.describe()
     return out

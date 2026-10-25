@@ -1,0 +1,491 @@
+{
+  "seed": 42,
+  "scale": 50000,
+  "split": "test",
+  "definition": "capitulation = the attack episode's first approve decision; detected before capitulation = the detector's first firing is an earlier event than that approval; prompts until detection = prompts received when the detector first fired (detected episodes only)",
+  "by_strength": {
+    "1.0": {
+      "overall": {
+        "splunk": {
+          "n_attack_episodes": 2322,
+          "detected_at_all": 0.3372093023255814,
+          "n_capitulated": 2064,
+          "detected_before_capitulation": 0.3241279069767442,
+          "detected_before_capitulation_ci": [
+            0.3042785424608583,
+            0.34463071172633497
+          ],
+          "detected_only_at_or_after_capitulation": 0.0,
+          "missed_capitulated": 0.6758720930232558,
+          "median_prompts_until_detection": 10,
+          "median_prompts_to_spare": 5,
+          "n_held_out_to_the_end": 258,
+          "detected_when_victim_held_out": 0.4418604651162791
+        },
+        "elastic": {
+          "n_attack_episodes": 2322,
+          "detected_at_all": 0.6098191214470284,
+          "n_capitulated": 2064,
+          "detected_before_capitulation": 0.0,
+          "detected_before_capitulation_ci": [
+            0.0,
+            0.0018577143834251873
+          ],
+          "detected_only_at_or_after_capitulation": 0.686046511627907,
+          "missed_capitulated": 0.313953488372093,
+          "median_prompts_until_detection": 9.0,
+          "median_prompts_to_spare": null,
+          "n_held_out_to_the_end": 258,
+          "detected_when_victim_held_out": 0.0
+        },
+        "deny_run_rule": {
+          "n_attack_episodes": 2322,
+          "detected_at_all": 0.9931093884582257,
+          "n_capitulated": 2064,
+          "detected_before_capitulation": 0.9922480620155039,
+          "detected_before_capitulation_ci": [
+            0.9874444564145022,
+            0.995222755006467
+          ],
+          "detected_only_at_or_after_capitulation": 0.0,
+          "missed_capitulated": 0.007751937984496124,
+          "median_prompts_until_detection": 2.0,
+          "median_prompts_to_spare": 7.0,
+          "n_held_out_to_the_end": 258,
+          "detected_when_victim_held_out": 1.0
+        },
+        "pulseguard": {
+          "n_attack_episodes": 2322,
+          "detected_at_all": 0.9995693367786391,
+          "n_capitulated": 2064,
+          "detected_before_capitulation": 0.9922480620155039,
+          "detected_before_capitulation_ci": [
+            0.9874444564145022,
+            0.995222755006467
+          ],
+          "detected_only_at_or_after_capitulation": 0.007267441860465116,
+          "missed_capitulated": 0.00048449612403100775,
+          "median_prompts_until_detection": 2,
+          "median_prompts_to_spare": 7.0,
+          "n_held_out_to_the_end": 258,
+          "detected_when_victim_held_out": 1.0
+        },
+        "stage_b": {
+          "n_attack_episodes": 2322,
+          "detected_at_all": 0.9987080103359173,
+          "n_capitulated": 2064,
+          "detected_before_capitulation": 0.9922480620155039,
+          "detected_before_capitulation_ci": [
+            0.9874444564145022,
+            0.995222755006467
+          ],
+          "detected_only_at_or_after_capitulation": 0.006298449612403101,
+          "missed_capitulated": 0.0014534883720930232,
+          "median_prompts_until_detection": 2,
+          "median_prompts_to_spare": 7.0,
+          "n_held_out_to_the_end": 258,
+          "detected_when_victim_held_out": 1.0
+        },
+        "stage_c": {
+          "n_attack_episodes": 2322,
+          "detected_at_all": 0.9931093884582257,
+          "n_capitulated": 2064,
+          "detected_before_capitulation": 0.9922480620155039,
+          "detected_before_capitulation_ci": [
+            0.9874444564145022,
+            0.995222755006467
+          ],
+          "detected_only_at_or_after_capitulation": 0.0,
+          "missed_capitulated": 0.007751937984496124,
+          "median_prompts_until_detection": 2.0,
+          "median_prompts_to_spare": 7.0,
+          "n_held_out_to_the_end": 258,
+          "detected_when_victim_held_out": 1.0
+        },
+        "frequency_only": {
+          "n_attack_episodes": 2322,
+          "detected_at_all": 0.9905254091300603,
+          "n_capitulated": 2064,
+          "detected_before_capitulation": 0.9525193798449613,
+          "detected_before_capitulation_ci": [
+            0.9424741597720407,
+            0.9608832963964486
+          ],
+          "detected_only_at_or_after_capitulation": 0.03875968992248062,
+          "missed_capitulated": 0.00872093023255814,
+          "median_prompts_until_detection": 2.0,
+          "median_prompts_to_spare": 7.0,
+          "n_held_out_to_the_end": 258,
+          "detected_when_victim_held_out": 0.9844961240310077
+        }
+      },
+      "by_profile": {
+        "high_volume_burst": {
+          "splunk": {
+            "n_attack_episodes": 785,
+            "detected_at_all": 0.8382165605095542,
+            "n_capitulated": 651,
+            "detected_before_capitulation": 0.8356374807987711,
+            "detected_before_capitulation_ci": [
+              0.8052152491220307,
+              0.8621218507417966
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.16436251920122888,
+            "median_prompts_until_detection": 10.0,
+            "median_prompts_to_spare": 7.0,
+            "n_held_out_to_the_end": 134,
+            "detected_when_victim_held_out": 0.8507462686567164
+          },
+          "elastic": {
+            "n_attack_episodes": 785,
+            "detected_at_all": 0.8292993630573249,
+            "n_capitulated": 651,
+            "detected_before_capitulation": 0.0,
+            "detected_before_capitulation_ci": [
+              0.0,
+              0.005866242536952714
+            ],
+            "detected_only_at_or_after_capitulation": 1.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 16,
+            "median_prompts_to_spare": null,
+            "n_held_out_to_the_end": 134,
+            "detected_when_victim_held_out": 0.0
+          },
+          "deny_run_rule": {
+            "n_attack_episodes": 785,
+            "detected_at_all": 1.0,
+            "n_capitulated": 651,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9941337574630472,
+              0.9999999999999999
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 14,
+            "n_held_out_to_the_end": 134,
+            "detected_when_victim_held_out": 1.0
+          },
+          "pulseguard": {
+            "n_attack_episodes": 785,
+            "detected_at_all": 1.0,
+            "n_capitulated": 651,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9941337574630472,
+              0.9999999999999999
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 14,
+            "n_held_out_to_the_end": 134,
+            "detected_when_victim_held_out": 1.0
+          },
+          "stage_b": {
+            "n_attack_episodes": 785,
+            "detected_at_all": 1.0,
+            "n_capitulated": 651,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9941337574630472,
+              0.9999999999999999
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 14,
+            "n_held_out_to_the_end": 134,
+            "detected_when_victim_held_out": 1.0
+          },
+          "stage_c": {
+            "n_attack_episodes": 785,
+            "detected_at_all": 1.0,
+            "n_capitulated": 651,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9941337574630472,
+              0.9999999999999999
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 14,
+            "n_held_out_to_the_end": 134,
+            "detected_when_victim_held_out": 1.0
+          },
+          "frequency_only": {
+            "n_attack_episodes": 785,
+            "detected_at_all": 1.0,
+            "n_capitulated": 651,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9941337574630472,
+              0.9999999999999999
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 14,
+            "n_held_out_to_the_end": 134,
+            "detected_when_victim_held_out": 1.0
+          }
+        },
+        "low_and_slow": {
+          "splunk": {
+            "n_attack_episodes": 756,
+            "detected_at_all": 0.0,
+            "n_capitulated": 632,
+            "detected_before_capitulation": 0.0,
+            "detected_before_capitulation_ci": [
+              0.0,
+              0.006041535617729212
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 1.0,
+            "median_prompts_until_detection": null,
+            "median_prompts_to_spare": null,
+            "n_held_out_to_the_end": 124,
+            "detected_when_victim_held_out": 0.0
+          },
+          "elastic": {
+            "n_attack_episodes": 756,
+            "detected_at_all": 0.0,
+            "n_capitulated": 632,
+            "detected_before_capitulation": 0.0,
+            "detected_before_capitulation_ci": [
+              0.0,
+              0.006041535617729212
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 1.0,
+            "median_prompts_until_detection": null,
+            "median_prompts_to_spare": null,
+            "n_held_out_to_the_end": 124,
+            "detected_when_victim_held_out": 0.0
+          },
+          "deny_run_rule": {
+            "n_attack_episodes": 756,
+            "detected_at_all": 1.0,
+            "n_capitulated": 632,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9939584643822708,
+              1.0
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2.0,
+            "median_prompts_to_spare": 7.0,
+            "n_held_out_to_the_end": 124,
+            "detected_when_victim_held_out": 1.0
+          },
+          "pulseguard": {
+            "n_attack_episodes": 756,
+            "detected_at_all": 1.0,
+            "n_capitulated": 632,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9939584643822708,
+              1.0
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2.0,
+            "median_prompts_to_spare": 7.0,
+            "n_held_out_to_the_end": 124,
+            "detected_when_victim_held_out": 1.0
+          },
+          "stage_b": {
+            "n_attack_episodes": 756,
+            "detected_at_all": 1.0,
+            "n_capitulated": 632,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9939584643822708,
+              1.0
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2.0,
+            "median_prompts_to_spare": 7.0,
+            "n_held_out_to_the_end": 124,
+            "detected_when_victim_held_out": 1.0
+          },
+          "stage_c": {
+            "n_attack_episodes": 756,
+            "detected_at_all": 1.0,
+            "n_capitulated": 632,
+            "detected_before_capitulation": 1.0,
+            "detected_before_capitulation_ci": [
+              0.9939584643822708,
+              1.0
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2.0,
+            "median_prompts_to_spare": 7.0,
+            "n_held_out_to_the_end": 124,
+            "detected_when_victim_held_out": 1.0
+          },
+          "frequency_only": {
+            "n_attack_episodes": 756,
+            "detected_at_all": 0.9708994708994709,
+            "n_capitulated": 632,
+            "detected_before_capitulation": 0.870253164556962,
+            "detected_before_capitulation_ci": [
+              0.8418023551035935,
+              0.8942301786478349
+            ],
+            "detected_only_at_or_after_capitulation": 0.10126582278481013,
+            "missed_capitulated": 0.028481012658227847,
+            "median_prompts_until_detection": 4.0,
+            "median_prompts_to_spare": 5.5,
+            "n_held_out_to_the_end": 124,
+            "detected_when_victim_held_out": 0.967741935483871
+          }
+        },
+        "social_engineering_assisted": {
+          "splunk": {
+            "n_attack_episodes": 781,
+            "detected_at_all": 0.16005121638924455,
+            "n_capitulated": 781,
+            "detected_before_capitulation": 0.16005121638924455,
+            "detected_before_capitulation_ci": [
+              0.13600969526111073,
+              0.18742054146735837
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.8399487836107554,
+            "median_prompts_until_detection": 10,
+            "median_prompts_to_spare": 1,
+            "n_held_out_to_the_end": 0,
+            "detected_when_victim_held_out": null
+          },
+          "elastic": {
+            "n_attack_episodes": 781,
+            "detected_at_all": 0.9795134443021767,
+            "n_capitulated": 781,
+            "detected_before_capitulation": 0.0,
+            "detected_before_capitulation_ci": [
+              0.0,
+              0.00489456663829446
+            ],
+            "detected_only_at_or_after_capitulation": 0.9795134443021767,
+            "missed_capitulated": 0.020486555697823303,
+            "median_prompts_until_detection": 6,
+            "median_prompts_to_spare": null,
+            "n_held_out_to_the_end": 0,
+            "detected_when_victim_held_out": null
+          },
+          "deny_run_rule": {
+            "n_attack_episodes": 781,
+            "detected_at_all": 0.9795134443021767,
+            "n_capitulated": 781,
+            "detected_before_capitulation": 0.9795134443021767,
+            "detected_before_capitulation_ci": [
+              0.9669817872217606,
+              0.9873510803684026
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.020486555697823303,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 4,
+            "n_held_out_to_the_end": 0,
+            "detected_when_victim_held_out": null
+          },
+          "pulseguard": {
+            "n_attack_episodes": 781,
+            "detected_at_all": 0.998719590268886,
+            "n_capitulated": 781,
+            "detected_before_capitulation": 0.9795134443021767,
+            "detected_before_capitulation_ci": [
+              0.9669817872217606,
+              0.9873510803684026
+            ],
+            "detected_only_at_or_after_capitulation": 0.019206145966709345,
+            "missed_capitulated": 0.0012804097311139564,
+            "median_prompts_until_detection": 2.0,
+            "median_prompts_to_spare": 4,
+            "n_held_out_to_the_end": 0,
+            "detected_when_victim_held_out": null
+          },
+          "stage_b": {
+            "n_attack_episodes": 781,
+            "detected_at_all": 0.9961587708066582,
+            "n_capitulated": 781,
+            "detected_before_capitulation": 0.9795134443021767,
+            "detected_before_capitulation_ci": [
+              0.9669817872217606,
+              0.9873510803684026
+            ],
+            "detected_only_at_or_after_capitulation": 0.016645326504481434,
+            "missed_capitulated": 0.0038412291933418692,
+            "median_prompts_until_detection": 2.0,
+            "median_prompts_to_spare": 4,
+            "n_held_out_to_the_end": 0,
+            "detected_when_victim_held_out": null
+          },
+          "stage_c": {
+            "n_attack_episodes": 781,
+            "detected_at_all": 0.9795134443021767,
+            "n_capitulated": 781,
+            "detected_before_capitulation": 0.9795134443021767,
+            "detected_before_capitulation_ci": [
+              0.9669817872217606,
+              0.9873510803684026
+            ],
+            "detected_only_at_or_after_capitulation": 0.0,
+            "missed_capitulated": 0.020486555697823303,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 4,
+            "n_held_out_to_the_end": 0,
+            "detected_when_victim_held_out": null
+          },
+          "frequency_only": {
+            "n_attack_episodes": 781,
+            "detected_at_all": 1.0,
+            "n_capitulated": 781,
+            "detected_before_capitulation": 0.9795134443021767,
+            "detected_before_capitulation_ci": [
+              0.9669817872217606,
+              0.9873510803684026
+            ],
+            "detected_only_at_or_after_capitulation": 0.020486555697823303,
+            "missed_capitulated": 0.0,
+            "median_prompts_until_detection": 2,
+            "median_prompts_to_spare": 4,
+            "n_held_out_to_the_end": 0,
+            "detected_when_victim_held_out": null
+          }
+        }
+      },
+      "operating_point": {
+        "weights": {
+          "a": 0.1,
+          "b": 0.85,
+          "c": 0.05
+        },
+        "thresholds": {
+          "stage_b": 0.74,
+          "frequency_only": 0.87,
+          "stage_c": 0.76,
+          "pulseguard": 0.67,
+          "isolation_forest": 0.6,
+          "logistic_regression": 0.75,
+          "stage_a": 0.5
+        }
+      },
+      "fatigue": {
+        "strength": 1.0,
+        "shape": "linear",
+        "null_model": "legacy",
+        "benign_source": "legacy",
+        "heterogeneity": 0.0
+      }
+    }
+  }
+}

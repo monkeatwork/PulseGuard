@@ -63,9 +63,19 @@ make pipeline   # data -> generate -> baselines -> train -> tune -> ablation -> 
 
 `make data` fetches the RBA dataset from Zenodo (about 1.1 GB, MD5-verified) and has **no synthetic fallback**: if the fetch fails it stops. Training writes `model_registry/` (`stage_b.json`, `stage_b_calibrator.pkl`, `stage_c.pt`/`.npz`, `operating_point.json`). The live scorer refuses to start without them. Rebuild the images afterwards (`config-everything`).
 
+## Research experiments (fatigue sweep, before capitulation, adaptive attacker)
+
+```bash
+make research            # hours at full scale: SCALE=5000 make research to try it first
+make report              # appends the research sections to final_report.md
+```
+
+`eval/research/` trains every stage in memory with the production functions and never touches `model_registry/`. Splunk and Elastic always go through the frozen harness. The generator's fatigue model is a parameter (`cli.py --fatigue-strength/--fatigue-shape/--fatigue-null/--benign-latency/--fatigue-heterogeneity`); its defaults reproduce the original corpus byte for byte. `eval/results/REPRODUCTION.md` records the reproduction of the committed numbers. Design decisions: DECISIONS.md, 2026-10-26.
+
 ## Known issues and limits
 
-- The benchmark's attacks are synthetic overlays on real benign RBA logins. Latency parameters come from published human-subjects measurements, and the benign denial rate is an assumption (see DECISIONS.md).
+- The benchmark's attacks are synthetic overlays on real benign RBA logins. The RBA data has no push prompts or decisions, so every approve/deny and every reaction time is generated. The default latency parameters are hand-picked, not measured (an optional benign model is fitted to the DuoLungo field data, `--benign-latency duolungo`), and the benign denial rate is an assumption (see DECISIONS.md).
+- No benign profile ever denies twice in a row, while almost every attack does, so a one-line "two consecutive denials" rule separates the classes on this benchmark. Every research result reports that rule next to PulseGuard.
 - Low-and-slow attacks are generated *without* within-episode fatigue drift, so `latency_drift_slope` carries no signal for that profile by construction. See the ablation result in `final_report.md`.
 - The mitigation controller's per-user state is in memory and resets when the service restarts. `run` always starts fresh anyway.
 - Only the replay and simulator adapters exist; Entra ID, Okta and Duo are future work. The IdP is a mock.
