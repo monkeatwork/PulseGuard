@@ -27,6 +27,14 @@ from pathlib import Path
 import pandas as pd
 
 from benchmark.generator import attack_profiles as ap
+from benchmark.generator.latency_models import (
+    BENIGN_SOURCES,
+    DEFAULT_FATIGUE,
+    FATIGUE_SHAPES,
+    NULL_MODELS,
+    FatigueConfig,
+    episode_strength,
+)
 from benchmark.generator.rba_loader import RbaFetchError, iter_rba_benign_rows
 from benchmark.generator.seed import child_rng, child_seed, deterministic_uuid
 from pulseguard_common.event_schema import PulseGuardEvent
@@ -133,9 +141,13 @@ def collect_benign_users(
     return users, rows_scanned
 
 
+ATTACK_PROFILES = ("high_volume_burst", "low_and_slow", "social_engineering_assisted")
+
+
 def build_corpus(
     seed: int,
     users: dict[str, list[dict]],
+    fatigue: FatigueConfig = DEFAULT_FATIGUE,
 ) -> tuple[list[dict], dict[str, int]]:
     records: list[dict] = []
     profile_counts: dict[str, int] = {name: 0 for _, name in PROFILE_BUCKETS}
@@ -155,26 +167,34 @@ def build_corpus(
         victim_country = last_login["geo_country"] or "US"
         rng = child_rng(seed, user_id, profile)
         start_ts = last_login["ts"] + timedelta(hours=1)
+        # Per-episode fatigue strength comes from its own child stream, so a
+        # heterogeneous config shifts no other draw in the corpus.
+        strength = (
+            episode_strength(child_rng(seed, user_id, "fatigue"), fatigue)
+            if profile in ATTACK_PROFILES
+            else None
+        )
+        kw = dict(fatigue=fatigue, strength=strength)
 
         if profile == "high_volume_burst":
             burst = ap.generate_high_volume_burst(
-                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country
+                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country, **kw
             )
         elif profile == "low_and_slow":
             burst = ap.generate_low_and_slow(
-                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country
+                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country, **kw
             )
         elif profile == "social_engineering_assisted":
             burst = ap.generate_social_engineering_assisted(
-                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country
+                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country, **kw
             )
         elif profile == "benign_high_activity":
             burst = ap.generate_benign_high_activity_session(
-                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country
+                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country, **kw
             )
         elif profile == "benign_occasional_denial":
             burst = ap.generate_benign_occasional_denial_session(
-                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country
+                rng, user_id, start_ts, victim_device_id, victim_user_agent, victim_src_ip, victim_country, **kw
             )
         else:
             burst = []
@@ -230,6 +250,7 @@ def run(
     rba_zip: Path,
     out_dir: Path,
     max_rows_scanned: int = DEFAULT_MAX_ROWS_SCANNED,
+    fatigue: FatigueConfig = DEFAULT_FATIGUE,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -245,7 +266,7 @@ def run(
             len(users),
         )
 
-    records, profile_counts = build_corpus(seed, users)
+    records, profile_counts = build_corpus(seed, users, fatigue)
     df = finalize_records(records, seed)
 
     events_path = out_dir / "events.parquet"
@@ -257,6 +278,7 @@ def run(
         "actual_users": len(users),
         "rows_scanned": rows_scanned,
         "profile_counts": profile_counts,
+        "fatigue": fatigue.as_dict(),
         "total_events": len(df),
         "events_sha256": _sha256_of_file(events_path),
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -275,6 +297,16 @@ def _cli() -> int:
     parser.add_argument("--rba-zip", default="data/raw/rba-dataset.zip")
     parser.add_argument("--out", default="data/generated")
     parser.add_argument("--max-rows-scanned", type=int, default=DEFAULT_MAX_ROWS_SCANNED)
+    # Fatigue model (latency_models.FatigueConfig). The defaults reproduce
+    # the original corpus byte for byte.
+    parser.add_argument("--fatigue-strength", type=float, default=DEFAULT_FATIGUE.strength,
+                        help="0 = no latency collapse, 1 = the original full collapse")
+    parser.add_argument("--fatigue-shape", choices=FATIGUE_SHAPES, default=DEFAULT_FATIGUE.shape)
+    parser.add_argument("--fatigue-null", choices=NULL_MODELS, default=DEFAULT_FATIGUE.null_model,
+                        help="'matched' makes strength 0 carry no latency signal at all")
+    parser.add_argument("--benign-latency", choices=BENIGN_SOURCES, default=DEFAULT_FATIGUE.benign_source)
+    parser.add_argument("--fatigue-heterogeneity", type=float, default=DEFAULT_FATIGUE.heterogeneity,
+                        help="std of a per-episode multiplier on --fatigue-strength")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -289,7 +321,14 @@ def _cli() -> int:
         return 1
 
     try:
-        run(args.seed, args.scale, rba_zip, Path(args.out), args.max_rows_scanned)
+        fatigue = FatigueConfig(
+            strength=args.fatigue_strength,
+            shape=args.fatigue_shape,
+            null_model=args.fatigue_null,
+            benign_source=args.benign_latency,
+            heterogeneity=args.fatigue_heterogeneity,
+        )
+        run(args.seed, args.scale, rba_zip, Path(args.out), args.max_rows_scanned, fatigue)
     except RbaFetchError as exc:
         logger.error("Generator halted: %s", exc)
         return 1

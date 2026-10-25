@@ -101,3 +101,43 @@ def test_profile_mix_roughly_matches_configured_ratios():
         "low_and_slow",
         "social_engineering_assisted",
     }
+
+
+# --- Fatigue configuration ---------------------------------------------------
+
+from benchmark.generator.latency_models import FatigueConfig  # noqa: E402
+
+# _df_hash of the 300-user fake corpus at seed 42, computed with the generator
+# as it was BEFORE fatigue strength became a parameter. If this moves, the
+# default corpus moved, and every committed result is no longer reproducible.
+GOLDEN_DEFAULT_CORPUS_HASH = "131aa35f4518c8424213256c0ad9e44fc6b730c9e1f69398eefb6ca59d5e0e34"
+
+
+def _corpus(fatigue: FatigueConfig | None = None, n: int = 300) -> pd.DataFrame:
+    kwargs = {} if fatigue is None else {"fatigue": fatigue}
+    records, _ = build_corpus(42, _fake_users(n), **kwargs)
+    return finalize_records(records, seed=42)
+
+
+def test_default_fatigue_config_leaves_the_corpus_unchanged():
+    assert _df_hash(_corpus()) == GOLDEN_DEFAULT_CORPUS_HASH
+    assert _df_hash(_corpus(FatigueConfig())) == GOLDEN_DEFAULT_CORPUS_HASH
+
+
+def test_fatigue_strength_changes_attack_latencies_only():
+    """Paired corpora: the same users, episodes and decisions at every
+    strength; only attack latencies (and the timestamps they push) move."""
+    full = _corpus(FatigueConfig(strength=1.0, null_model="matched"))
+    none = _corpus(FatigueConfig(strength=0.0, null_model="matched"))
+    assert len(full) == len(none)
+    assert full["burst_id"].equals(none["burst_id"])
+    assert full["decision"].equals(none["decision"])
+    benign = full["label_attack"] == False  # noqa: E712
+    assert full.loc[benign, "decision_latency_ms"].equals(none.loc[benign, "decision_latency_ms"])
+    attack = full["label_attack"] & full["decision_latency_ms"].notna()
+    assert not full.loc[attack, "decision_latency_ms"].equals(none.loc[attack, "decision_latency_ms"])
+
+
+def test_non_default_fatigue_config_is_still_deterministic():
+    config = FatigueConfig(strength=0.5, shape="exponential", null_model="matched", heterogeneity=0.3)
+    assert _df_hash(_corpus(config, 60)) == _df_hash(_corpus(config, 60))

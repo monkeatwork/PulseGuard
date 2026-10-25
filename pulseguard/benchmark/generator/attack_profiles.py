@@ -29,6 +29,8 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from benchmark.generator.latency_models import (
+    DEFAULT_FATIGUE,
+    FatigueConfig,
     sample_benign_approve_latency_ms,
     sample_benign_deny_latency_ms,
     sample_fatigue_latency_ms,
@@ -160,6 +162,9 @@ def generate_high_volume_burst(
     victim_user_agent: str,
     victim_src_ip: str,
     victim_country: str,
+    *,
+    fatigue: FatigueConfig = DEFAULT_FATIGUE,
+    strength: float | None = None,
 ) -> list[RawEvent]:
     n = int(rng.integers(*HIGH_VOLUME_PROMPT_COUNT_RANGE))
     attacker_ip = f"198.51.100.{int(rng.integers(1, 254))}"
@@ -172,7 +177,7 @@ def generate_high_volume_burst(
     for i in range(n):
         is_last = i == n - 1
         decision = _final_decision(rng) if is_last else "deny"
-        latency_ms = sample_fatigue_latency_ms(rng, i, n)
+        latency_ms = sample_fatigue_latency_ms(rng, i, n, decision, fatigue, strength)
         events.extend(
             _prompt_decision_pair(
                 user_id=user_id,
@@ -206,6 +211,9 @@ def generate_low_and_slow(
     victim_user_agent: str,
     victim_src_ip: str,
     victim_country: str,
+    *,
+    fatigue: FatigueConfig = DEFAULT_FATIGUE,
+    strength: float | None = None,
 ) -> list[RawEvent]:
     n = int(rng.integers(*LOW_AND_SLOW_PROMPT_COUNT_RANGE))
     attacker_ip = f"203.0.113.{int(rng.integers(1, 254))}"
@@ -222,9 +230,9 @@ def generate_low_and_slow(
         # drift is modeled here (the whole point of low-and-slow is to look
         # like isolated, unrelated benign denials).
         latency_ms = (
-            sample_benign_approve_latency_ms(rng)
+            sample_benign_approve_latency_ms(rng, fatigue.benign_source)
             if decision == "approve"
-            else sample_benign_deny_latency_ms(rng)
+            else sample_benign_deny_latency_ms(rng, fatigue.benign_source)
         )
         events.extend(
             _prompt_decision_pair(
@@ -259,6 +267,9 @@ def generate_social_engineering_assisted(
     victim_user_agent: str,
     victim_src_ip: str,
     victim_country: str,
+    *,
+    fatigue: FatigueConfig = DEFAULT_FATIGUE,
+    strength: float | None = None,
 ) -> list[RawEvent]:
     n = int(rng.integers(*SOCIAL_ENG_PROMPT_COUNT_RANGE))
     lure_fraction = float(rng.uniform(*SOCIAL_ENG_LURE_INDEX_FRACTION_RANGE))
@@ -273,13 +284,13 @@ def generate_social_engineering_assisted(
     for i in range(n):
         if i == lure_index:
             decision = "approve"
-            latency_ms = sample_lure_latency_ms(rng)
+            latency_ms = sample_lure_latency_ms(rng, fatigue, strength)
         elif i > lure_index:
             # Attack already succeeded at the lure point; profile ends there.
             break
         else:
             decision = "deny"
-            latency_ms = sample_fatigue_latency_ms(rng, i, lure_index + 1)
+            latency_ms = sample_fatigue_latency_ms(rng, i, lure_index + 1, "deny", fatigue, strength)
         events.extend(
             _prompt_decision_pair(
                 user_id=user_id,
@@ -313,6 +324,9 @@ def generate_benign_high_activity_session(
     victim_user_agent: str,
     victim_src_ip: str,
     victim_country: str,
+    *,
+    fatigue: FatigueConfig = DEFAULT_FATIGUE,
+    strength: float | None = None,
 ) -> list[RawEvent]:
     """Hard negative: a legitimate power user authenticating many times a
     day. Latency stays stationary (drawn from the same benign distribution
@@ -347,11 +361,11 @@ def generate_benign_high_activity_session(
     for _ in range(n):
         session_id = str(_rng_uuid(rng))
         if rng.random() < BENIGN_HIGH_ACTIVITY_DENIAL_PROBABILITY:
-            deny_latency = sample_benign_deny_latency_ms(rng)
+            deny_latency = sample_benign_deny_latency_ms(rng, fatigue.benign_source)
             events.extend(_own_prompt(ts, "deny", deny_latency, session_id))
             retry_gap = int(rng.integers(*BENIGN_RETRY_GAP_SECONDS_RANGE))
             ts = ts + timedelta(milliseconds=deny_latency) + timedelta(seconds=retry_gap)
-        latency_ms = sample_benign_approve_latency_ms(rng)
+        latency_ms = sample_benign_approve_latency_ms(rng, fatigue.benign_source)
         events.extend(_own_prompt(ts, "approve", latency_ms, session_id))
         gap = int(rng.integers(*BENIGN_HIGH_ACTIVITY_GAP_SECONDS_RANGE))
         ts = ts + timedelta(milliseconds=latency_ms) + timedelta(seconds=gap)
@@ -386,6 +400,9 @@ def generate_benign_occasional_denial_session(
     victim_user_agent: str,
     victim_src_ip: str,
     victim_country: str,
+    *,
+    fatigue: FatigueConfig = DEFAULT_FATIGUE,
+    strength: float | None = None,
 ) -> list[RawEvent]:
     """Hard negative: a legitimate user denies exactly one prompt (a
     mis-tap, or a login they briefly didn't recognize as their own) and
@@ -397,7 +414,7 @@ def generate_benign_occasional_denial_session(
     session_id_1 = str(_rng_uuid(rng))
     session_id_2 = str(_rng_uuid(rng))
 
-    deny_latency = sample_benign_deny_latency_ms(rng)
+    deny_latency = sample_benign_deny_latency_ms(rng, fatigue.benign_source)
     events = _prompt_decision_pair(
         user_id=user_id,
         prompt_ts=start_ts,
@@ -417,7 +434,7 @@ def generate_benign_occasional_denial_session(
 
     gap = int(rng.integers(*OCCASIONAL_DENIAL_GAP_SECONDS_RANGE))
     approve_ts = start_ts + timedelta(milliseconds=deny_latency) + timedelta(seconds=gap)
-    approve_latency = sample_benign_approve_latency_ms(rng)
+    approve_latency = sample_benign_approve_latency_ms(rng, fatigue.benign_source)
     events.extend(
         _prompt_decision_pair(
             user_id=user_id,
@@ -440,7 +457,7 @@ def generate_benign_occasional_denial_session(
     ts = approve_ts + timedelta(milliseconds=approve_latency)
     for _ in range(int(rng.integers(*OCCASIONAL_DENIAL_EXTRA_APPROVALS_RANGE))):
         ts = ts + timedelta(seconds=int(rng.integers(*OCCASIONAL_DENIAL_FOLLOWUP_GAP_SECONDS_RANGE)))
-        latency = sample_benign_approve_latency_ms(rng)
+        latency = sample_benign_approve_latency_ms(rng, fatigue.benign_source)
         events.extend(
             _prompt_decision_pair(
                 user_id=user_id,
