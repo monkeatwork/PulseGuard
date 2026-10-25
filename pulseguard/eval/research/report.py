@@ -50,17 +50,22 @@ def _ci(cell: dict, digits=3) -> str:
     return f"{_f(cell['mean'], digits)} [{_f(cell['ci_low'], digits)}, {_f(cell['ci_high'], digits)}]"
 
 
-def sweep_section(sweep: dict) -> list[str]:
+def sweep_section(sweep: dict, title="Fatigue-strength sweep", figure="fatigue_sweep.png") -> list[str]:
     cfg, summary = sweep["config"], sweep["summary"]
     strengths = list(summary)
+    matched = cfg["base_fatigue"]["null_model"] == "matched"
+    zero_desc = (
+        "attack latencies drawn from exactly the benign distributions"
+        if matched
+        else "only the collapse end point is removed; the attack latency spread and the lure still differ from benign"
+    )
     lines = [
-        "## Fatigue-strength sweep",
+        f"## {title}",
         "",
         f"Corpus regenerated, every model retrained and evaluated at each fatigue strength s "
         f"(null model **{cfg['base_fatigue']['null_model']}**, shape {cfg['base_fatigue']['shape']}, "
-        f"{cfg['scale']:,} users, seeds {', '.join(cfg['seeds'])}). s = 0: attack latencies drawn from exactly the "
-        f"benign distributions; s = 1: the full collapse to a 0.74 s median. Cells: mean across seeds "
-        f"[95% CI]. Test split, by user. Figure: `fatigue_sweep.png`.",
+        f"{cfg['scale']:,} users, seed{'s' if len(cfg['seeds']) > 1 else ''} {', '.join(cfg['seeds'])}). s = 0: {zero_desc}; s = 1: the full collapse "
+        f"to a 0.74 s median. Cells: mean across seeds [95% CI]. Test split, by user. Figure: `{figure}`.",
         "",
     ]
     for metric, label in (("recall", "Recall"), ("fpr", "False-positive rate"), ("precision", "Precision")):
@@ -79,8 +84,8 @@ def sweep_section(sweep: dict) -> list[str]:
     lines += [
         "**Key question: at s = 0, does PulseGuard still beat the rules?** "
         + (
-            f"Yes, against the industry rules: recall {pg:.3f} vs Elastic {el:.3f} and Splunk {sp:.3f}, with no latency "
-            f"signal in the data at all. "
+            f"Yes, against the industry rules: recall {pg:.3f} vs Elastic {el:.3f} and Splunk {sp:.3f}"
+            + (", with no latency signal in the data at all. " if matched else ". ")
             if beats_rules
             else f"No: recall {pg:.3f} vs Elastic {el:.3f} and Splunk {sp:.3f}. "
         )
@@ -267,6 +272,49 @@ def hard_negative_section(files: list[dict]) -> list[str]:
     return lines
 
 
+def claims_section(sweep: dict, hard: list[dict]) -> list[str]:
+    """What the measurements support, stated against the original claim."""
+    summ = sweep["summary"]
+    one, zero = summ.get("1.0") or summ[list(summ)[-1]], summ.get("0.0") or summ[list(summ)[0]]
+    m = lambda cell, d, k: cell[d][k]["mean"] or 0  # noqa: E731
+    lines = [
+        "## What these results support",
+        "",
+        f"1. **Against the industry rules, PulseGuard detects far more attacks at a comparable false-positive rate.** "
+        f"At s = 1: recall {m(one, 'pulseguard', 'recall'):.3f} (FPR {m(one, 'pulseguard', 'fpr'):.4f}) vs Elastic "
+        f"{m(one, 'elastic', 'recall'):.3f} and Splunk {m(one, 'splunk', 'recall'):.3f}, mean of "
+        f"{len(sweep['config']['seeds'])} seeds.",
+        f"2. **Response behaviour cuts false positives.** Frequency features alone: FPR "
+        f"{m(one, 'frequency_only', 'fpr'):.3f}; with the response-behaviour family: {m(one, 'pulseguard', 'fpr'):.4f}. "
+        f"The work is done by the decision sequence (consecutive denials): on this benchmark a one-line "
+        f"two-denials rule (recall {m(one, 'deny_run_rule', 'recall'):.3f}, FPR {m(one, 'deny_run_rule', 'fpr'):.4f}) "
+        f"and a logistic regression (recall {m(one, 'logistic_regression', 'recall'):.3f}) match it.",
+        f"3. **`latency_drift_slope` and the latency collapse are a hypothesis, not a measured contribution.** "
+        f"Removing every latency difference between attack and benign (s = 0, matched null) moves PulseGuard recall "
+        f"from {m(one, 'pulseguard', 'recall'):.3f} to {m(zero, 'pulseguard', 'recall'):.3f}. Whether real fatigued "
+        f"users collapse their latency, and by how much, needs a user study; the sweep shows the detector does not "
+        f"depend on it.",
+    ]
+    big = max(hard, key=lambda d: d["config"]["hard_negatives"]["deny_run_rate"], default=None)
+    if big is not None:
+        hs = big["summary"]
+        lo, hi = hs[list(hs)[0]], hs[list(hs)[-1]]
+        r = big["config"]["hard_negatives"]["deny_run_rate"]
+        lines.append(
+            f"4. **Latency becomes useful when denials stop being free evidence.** If {r:.0%} of benign high-activity "
+            f"logins follow a run of denials, the two-denials rule's FPR rises to {m(hi, 'deny_run_rule', 'fpr'):.3f}, "
+            f"while PulseGuard's FPR is {m(lo, 'pulseguard', 'fpr'):.4f} without a latency signal and "
+            f"{m(hi, 'pulseguard', 'fpr'):.4f} with the full collapse (one seed). This is the setting in which the "
+            f"response-latency hypothesis can be tested."
+        )
+    lines += [
+        "5. **Known evasion:** an attacker who spaces prompts further apart than the 60-minute session gap is missed by "
+        "every session-scoped detector (see Adaptive attacker); a cross-session denial counter closes it.",
+        "",
+    ]
+    return lines
+
+
 def build_research_sections(results_dir: Path) -> str:
     parts: list[str] = ["", "# Research extensions (HANDOFF.md tasks 1-4)", ""]
     for name, fn in (
@@ -280,8 +328,7 @@ def build_research_sections(results_dir: Path) -> str:
         if data is None:
             continue
         if name == "fatigue_sweep_legacy.json":
-            section = sweep_section(data)
-            section[0] = "## Fatigue-strength sweep, original (legacy) formula"
+            section = sweep_section(data, "Fatigue-strength sweep, original (legacy) formula", "fatigue_sweep_legacy.png")
             section.insert(2, "HANDOFF.md's literal definition: only the end point of the collapse moves with s; the "
                               "attack latency spread and the 1-2 s lure stay as they were, so s = 0 still carries a "
                               "latency signal. Shown for comparison with the matched sweep above.\n")
@@ -291,4 +338,7 @@ def build_research_sections(results_dir: Path) -> str:
     hard = [json.loads(p.read_text()) for p in sorted(results_dir.glob("hard_negatives_r*.json"))]
     if hard:
         parts += hard_negative_section(hard)
+    sweep = _load(results_dir, "fatigue_sweep.json")
+    if sweep is not None:
+        parts[3:3] = claims_section(sweep, hard)
     return "\n".join(parts)

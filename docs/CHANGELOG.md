@@ -57,3 +57,23 @@ One entry per working iteration: what changed, why, files touched, known issues,
 - The benign deny-run rate is an assumption; it is swept, not measured.
 
 **Next step:** 5-seed sweep, legacy sweep, robustness and hard-negative sweeps (queued), then the report.
+
+## 2026-10-26 — Iteration 4: 5-seed sweep, robustness, hard negatives, reframed report (tasks 1, 4, 5)
+
+**What changed**
+- `fatigue_sweep.json/.png`: matched-null sweep over s in {0, .25, .5, .75, 1}, 5 seeds, 95% CIs, with a train/test strength grid. PulseGuard recall 0.995 at s = 0 and 0.999 at s = 1 (FPR 0.0015 / 0.0012), vs Elastic 0.618 and Splunk 0.316. Every grid cell is between 0.995 and 0.999.
+- `fatigue_sweep_legacy.json/.png`: HANDOFF's original formula, seed 42, for comparison. The results are the same.
+- `robustness.json`: a model trained on the linear s = 1 collapse, tested on exponential and step shapes, heterogeneous victims and DuoLungo benign latency. Recall stays at or above 0.994 and FPR at 0.0013, so retraining isn't needed.
+- `hard_negatives_r{0.01,0.03,0.1}.json`: with benign deny runs, the two-denials rule and Elastic FPR rise to 0.10, 0.23 and 0.42; PulseGuard stays at 0.006-0.037. At r = 0.1, the latency collapse reduces PulseGuard FPR from 0.037 (s = 0) to 0.010 (s = 1). This is the first setting where latency measurably helps.
+- `final_report.md`: new "What these results support" section, computed from the result files (task 5 reframing). Response behaviour cuts FPRs, and the decision sequence does the work. `latency_drift_slope` and the latency collapse are presented as a hypothesis. The legacy-sweep text no longer describes s = 0 as signal-free.
+
+**Why:** HANDOFF tasks 1, 4 and 5, plus additions A-F.
+
+**Files touched:** `pulseguard/eval/research/report.py`, `pulseguard/eval/results/{final_report.md,fatigue_sweep*.{json,png},robustness.json,hard_negatives_r*.json}`, `docs/CHANGELOG.md`.
+
+**Known issues**
+- The robustness and hard-negative runs use one seed. The r = 0.1 latency effect needs confirming across seeds.
+- Pacing beyond the 60-minute session gap evades PulseGuard (iteration 3); no cross-session counter yet.
+- The latency model is still synthetic; no user study.
+
+**Next step:** benchmark release bundle (addition G: datasheet, corpus hash, license, Zenodo metadata); cross-session denial counter.
