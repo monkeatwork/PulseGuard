@@ -58,6 +58,8 @@ class Alert(Base):
     burst_id = Column(String, nullable=True, unique=True)  # the scored session's episode id
     n_decisions = Column(Integer, nullable=False, default=1)
     first_crossing_decision = Column(Integer, nullable=True)
+    guard_unresolved_denials = Column(Integer, nullable=True)
+    guard_fired = Column(Boolean, nullable=False, default=False)
     status = Column(String, nullable=False, default="open")
 
 
@@ -77,6 +79,8 @@ class Score(Base):
     threshold = Column(Float, nullable=False)
     raised = Column(Boolean, nullable=False)
     scoring_ms = Column(Float, nullable=False)
+    guard_unresolved_denials = Column(Integer, nullable=True)
+    guard_fired = Column(Boolean, nullable=False, default=False)
 
 
 class MitigationAction(Base):

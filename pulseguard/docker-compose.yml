@@ -138,6 +138,7 @@ services:
     environment: *python-env
     depends_on:
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
       kafka-init: { condition: service_completed_successfully }
     restart: on-failure
     mem_limit: 256m

@@ -104,3 +104,41 @@ def test_replayed_attack_is_alerted_and_stepped_up(compose_stack):
     challenge = _wait(lambda: next((c for c in _get(f"/api/ingestion/idp/challenges?user_id={urllib.parse.quote(user)}")), None), 60,
                       "step-up challenge")
     assert challenge["kind"] == "step_up"
+
+
+SLOW_ATTACK_PRODUCER = """
+import uuid
+from datetime import datetime, timedelta, timezone
+from pulseguard_common.event_schema import PulseGuardEvent
+from services.ingestion.app.kafka_producer import EventProducer
+
+user, t0, producer = "{user}", datetime(2026, 3, 2, 9, tzinfo=timezone.utc), EventProducer()
+for k, decision in enumerate(["deny", "deny", "deny", "approve"]):
+    ts = t0 + timedelta(hours=2 * k)
+    for event_type, at, extra in (("mfa_prompt", ts, {{}}),
+                                  ("mfa_decision", ts + timedelta(seconds=4),
+                                   {{"decision": decision, "decision_latency_ms": 4000}})):
+        producer.produce(PulseGuardEvent(event_id=uuid.uuid4(), user_id=user, ts=at, event_type=event_type,
+                                         src_ip="203.0.113.9", device_id="phone-1", user_agent="push",
+                                         session_id=f"slow-{{k}}", ingest_ts=at, **extra))
+producer.flush()
+"""
+
+
+def test_slow_attack_beyond_the_session_gap_is_raised_by_the_cross_session_guard(compose_stack):
+    """Prompts 2 h apart: every one is its own session, which session
+    scoring never alerts on (eval/results/adaptive_attacker.json). The
+    guard, running in the detection engine on Redis state, must raise it on
+    the capitulation approval and the mitigation path must step it up."""
+    _wait(lambda: _get("/api/detection/health")["live_scorer"], STARTUP_TIMEOUT_SECONDS, "live scorer")
+    user = f"slow-e2e-{int(time.time())}"
+    _exec("ingestion", "python", "-c", SLOW_ATTACK_PRODUCER.format(user=user))
+    alert = _wait(lambda: next((a for a in _get("/api/detection/alerts") if a["user_id"] == user), None), 120, "guard alert")
+    assert alert["explanation_source"] == "cross_session_guard"
+    detail = _get(f"/api/detection/alerts/{alert['alert_id']}")
+    assert detail["shap_top3"][0]["feature"] == "unresolved_denials"
+    assert detail["shap_top3"][0]["feature_value"] == 3
+    challenge = _wait(lambda: next((c for c in _get(f"/api/ingestion/idp/challenges?user_id={urllib.parse.quote(user)}")), None), 60,
+                      "step-up challenge")
+    assert challenge["kind"] == "step_up"
+    assert _get("/api/detection/operating-point")["cross_session_guard"]["min_denials"] == 3

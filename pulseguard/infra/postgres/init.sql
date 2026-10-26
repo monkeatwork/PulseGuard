@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS alerts (
     burst_id TEXT UNIQUE,
     n_decisions INTEGER NOT NULL DEFAULT 1,
     first_crossing_decision INTEGER,
+    -- cross-session guard (detection_engine/app/cross_session_guard.py)
+    guard_unresolved_denials INTEGER,
+    guard_fired BOOLEAN NOT NULL DEFAULT false,
     status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'resolved'))
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_user_id_ts ON alerts (user_id, ts DESC);
@@ -66,6 +69,8 @@ CREATE TABLE IF NOT EXISTS scores (
     threshold DOUBLE PRECISION NOT NULL,
     raised BOOLEAN NOT NULL,
     scoring_ms DOUBLE PRECISION NOT NULL,
+    guard_unresolved_denials INTEGER,
+    guard_fired BOOLEAN NOT NULL DEFAULT false,
     -- a redelivered Kafka message re-scores the same decision point; this
     -- key makes that a no-op (hypertable unique keys must include ts)
     UNIQUE (episode_id, decision_index, ts)

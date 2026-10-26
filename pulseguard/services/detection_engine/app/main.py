@@ -3,8 +3,9 @@ and the SOC dashboard's read API -- alerts with their full evidence, the
 live score feed, KPIs, the persisted operating point, and the offline
 evaluation results.
 
-Startup fails loudly if the operating point or any model artifact is
-missing (live_scorer.LiveScorer): a detector running at a configuration
+Startup fails loudly if the operating point, any model artifact or the
+cross-session guard config is missing (live_scorer.LiveScorer,
+live_scorer.make_guard_store): a detector running at a configuration
 nothing evaluated is worse than one that does not start. Set
 LIVE_SCORER=off only for API tests that do not need the worker.
 """
@@ -30,7 +31,7 @@ from pulseguard_common.db.models import Alert, DeadLetter, Event, IdpChallenge, 
 from pulseguard_common.db.session import get_db
 
 _stop_event = threading.Event()
-_state: dict = {"scorer": None}
+_state: dict = {"scorer": None, "guard": None}
 # <repo>/eval/results locally; /srv/eval/results in the container (same layout).
 EVAL_RESULTS_DIR = Path(os.environ.get("EVAL_RESULTS_DIR", Path(__file__).resolve().parents[3] / "eval" / "results"))
 
@@ -46,11 +47,13 @@ def _configure_logging() -> None:
 async def lifespan(app: FastAPI):
     _configure_logging()
     if os.environ.get("LIVE_SCORER", "on") != "off":
-        from services.detection_engine.app.live_scorer import LiveScorer, run_live_scorer_loop
+        from services.detection_engine.app.live_scorer import LiveScorer, make_guard_store, run_live_scorer_loop
 
         scorer = LiveScorer()  # raises on a missing operating point / model: startup fails
+        guard = make_guard_store()  # likewise on a missing guard config
         _state["scorer"] = scorer
-        threading.Thread(target=run_live_scorer_loop, args=(_stop_event, scorer), daemon=True).start()
+        _state["guard"] = guard.config
+        threading.Thread(target=run_live_scorer_loop, args=(_stop_event, scorer, guard), daemon=True).start()
     yield
     _stop_event.set()
 
@@ -268,7 +271,8 @@ def operating_point() -> dict:
         raise HTTPException(status_code=503, detail="live scorer not running")
     from dataclasses import asdict
 
-    return asdict(scorer.operating_point)
+    guard = _state["guard"]
+    return {**asdict(scorer.operating_point), "cross_session_guard": guard.as_dict() if guard else None}
 
 
 @app.get("/eval/results")

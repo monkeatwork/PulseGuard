@@ -71,7 +71,11 @@ class AlertHandler:
         alert = json.loads(raw)
         user_id = alert["user_id"]
         fused_score = float(alert["fused_score"])
-        if fused_score < MITIGATION_CONSIDERATION_THRESHOLD:
+        # A guard alert is gated by the guard's own validated K, not by the
+        # fused score: a slow attack's sessions look benign one at a time,
+        # which is exactly why the guard exists.
+        guard_fired = bool(alert.get("guard_fired"))
+        if fused_score < MITIGATION_CONSIDERATION_THRESHOLD and not guard_fired:
             return None
 
         state = self.states.get(user_id)
@@ -80,7 +84,10 @@ class AlertHandler:
         episode = alert.get("episode_id") or alert.get("burst_id") or ""
 
         if action == "step_up_required":
-            if not self.webhook.trigger_step_up(user_id, episode, f"fused_score={fused_score:.3f}"):
+            reason = f"fused_score={fused_score:.3f}"
+            if guard_fired:
+                reason += f" unresolved_denials={alert.get('guard_unresolved_denials')}"
+            if not self.webhook.trigger_step_up(user_id, episode, reason):
                 # the challenge could not even be issued: count it as unconfirmed
                 state.record_failure(now)
         elif action == "alt_factor_required":
@@ -101,7 +108,7 @@ class AlertHandler:
             db.commit()
         finally:
             db.close()
-        logger.info("Mitigation action=%s user=%s fused=%.3f", action, user_id, fused_score)
+        logger.info("Mitigation action=%s user=%s fused=%.3f guard=%s", action, user_id, fused_score, guard_fired)
         return action
 
 

@@ -162,3 +162,61 @@ def test_handler_upserts_one_alert_per_session_and_is_idempotent(session_factory
     assert scores == 3  # redelivery did not duplicate the score row
     assert events == 6  # nor the events
     assert [m["reason"] for m in producer.messages] == ["raised", "approval_in_alerted_session"]
+
+
+# --- cross-session guard in the handler (real Postgres + real Redis) ------
+
+@pytest.fixture(scope="module")
+def guard_store():
+    import redis as redis_lib
+    from testcontainers.community.redis import RedisContainer
+
+    from services.detection_engine.app.cross_session_guard import CrossSessionGuardConfig
+    from services.detection_engine.app.cross_session_store import RedisDenialStore
+
+    with RedisContainer("redis:7.2-alpine") as container:
+        client = redis_lib.Redis(host=container.get_container_host_ip(), port=int(container.get_exposed_port(6379)))
+        yield RedisDenialStore(client, CrossSessionGuardConfig(min_denials=3, window_seconds=7 * 86400, resolve_seconds=600))
+
+
+def _single_prompt_session(user: str, k: int, decision: str) -> bytes:
+    """One prompt, one decision, 2 h after the previous: its own session,
+    which session scoring alone never alerts on."""
+    ts = T0 + timedelta(hours=2 * k)
+    dts = ts + timedelta(seconds=3)
+    seq = [
+        {"event_id": str(uuid.uuid4()), "event_type": "mfa_prompt", "ts": ts.isoformat(), "session_id": f"s{k}"},
+        {"event_id": str(uuid.UUID(int=1000 + k)), "event_type": "mfa_decision", "ts": dts.isoformat(),
+         "decision": decision, "decision_latency_ms": 3000, "session_id": f"s{k}"},
+    ]
+    return json.dumps({"feature_vector": {"user_id": user}, "episode_id": f"{user}:slow{k}", "session_id": f"s{k}",
+                       "decision_index": 0, "sequence": seq}).encode()
+
+
+def test_guard_raises_a_slow_attack_the_model_scores_as_benign(session_factory, guard_store):
+    scorer, producer = FakeScorer(), FakeProducer()
+    scorer.next_fused = 0.1  # every single-prompt session looks benign to the model
+    handler = EnrichedMessageHandler(scorer, session_factory, producer, guard_store)
+
+    for k, decision in enumerate(["deny", "deny", "deny", "approve"]):
+        handler(_single_prompt_session("slow-victim", k, decision))
+    handler(_single_prompt_session("slow-victim", 3, "approve"))  # redelivery
+
+    db = session_factory()
+    try:
+        alerts = db.execute(text(
+            "SELECT burst_id, explanation_source, guard_fired, guard_unresolved_denials, shap_top3 "
+            "FROM alerts WHERE user_id = 'slow-victim'")).all()
+        scored = db.execute(text(
+            "SELECT guard_unresolved_denials, guard_fired, raised FROM scores "
+            "WHERE user_id = 'slow-victim' ORDER BY ts")).all()
+    finally:
+        db.close()
+    assert [(a[0], a[1], a[2], a[3]) for a in alerts] == [("slow-victim:slow3", "cross_session_guard", True, 3)]
+    assert alerts[0][4][0]["feature"] == "unresolved_denials"
+    assert scored == [(0, False, False), (1, False, False), (2, False, False), (3, True, True)]
+    # the redelivered approval is re-published like any approval in an alerted
+    # session; the mitigation controller's cooldown absorbs it
+    assert [(m["reason"], m["guard_fired"], m["guard_unresolved_denials"]) for m in producer.messages] == [
+        ("raised", True, 3), ("approval_in_alerted_session", True, 3)
+    ]

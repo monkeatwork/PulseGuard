@@ -61,7 +61,7 @@ cd services/dashboard && npm ci && npx vitest run
 make pipeline   # data -> generate -> baselines -> train -> tune -> ablation -> adversarial -> report -> demo slice
 ```
 
-`make data` fetches the RBA dataset from Zenodo (about 1.1 GB, MD5-verified) and has **no synthetic fallback**: if the fetch fails it stops. Training writes `model_registry/` (`stage_b.json`, `stage_b_calibrator.pkl`, `stage_c.pt`/`.npz`, `operating_point.json`). The live scorer refuses to start without them. Rebuild the images afterwards (`config-everything`).
+`make data` fetches the RBA dataset from Zenodo (about 1.1 GB, MD5-verified) and has **no synthetic fallback**: if the fetch fails it stops. Training writes `model_registry/` (`stage_b.json`, `stage_b_calibrator.pkl`, `stage_c.pt`/`.npz`, `operating_point.json`); `make guard-config` writes `cross_session_guard.json` from the cross-session evaluation. The live scorer refuses to start without them. Rebuild the images afterwards (`config-everything`).
 
 ## Research experiments (fatigue sweep, before capitulation, adaptive attacker, cross-session guard)
 
@@ -72,7 +72,7 @@ make report              # appends the research sections to final_report.md
 
 `eval/research/` trains every stage in memory with the production functions and never touches `model_registry/`. Splunk and Elastic always go through the frozen harness. The generator's fatigue model is a parameter (`cli.py --fatigue-strength/--fatigue-shape/--fatigue-null/--benign-latency/--fatigue-heterogeneity`); its defaults reproduce the original corpus byte for byte. `eval/results/REPRODUCTION.md` records the reproduction of the committed numbers. Design decisions: DECISIONS.md, 2026-10-26.
 
-`services/detection_engine/app/cross_session_guard.py` counts unresolved denials per user across sessions, to catch attackers who space prompts more than an hour apart. It is evaluated offline (`eval/research/cross_session.py`) and is not yet wired into the live scorer.
+`services/detection_engine/app/cross_session_guard.py` counts unresolved denials per user across sessions, to catch attackers who space prompts more than an hour apart. It is evaluated offline (`eval/research/cross_session.py`) and runs in the live scorer: per-user state in Redis (`cross_session_store.py`), K and window from `model_registry/cross_session_guard.json`, and an alert it raises is stepped up like any other. `tests/integration/test_compose_health.py` sends a slow attack (prompts 2 h apart) through the running stack and checks that it is alerted and stepped up.
 
 ## Benchmark release bundle
 

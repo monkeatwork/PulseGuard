@@ -131,7 +131,9 @@ more than 10 minutes.
     only 1–2 denials).
   - Users never attacked who get flagged: at most **0.2%**, even when we add
     a stray unanswered denial on 30% of their active days.
-  - Not wired into the live service yet (needs Redis + Docker).
+  - It runs in the live service, with its memory kept in Redis. A test sends a
+    slow attack through the whole running system and checks that it gets
+    blocked with a step-up.
 - **The data is synthetic.** Normal logins come from a real dataset (Wiefling
   RBA), but the attacks, the Deny/Approve choices and the reaction times are
   generated. Nobody has measured how real tired users behave; that needs a

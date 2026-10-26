@@ -1,0 +1,18 @@
+{
+  "min_denials": 3,
+  "window_seconds": 604800,
+  "resolve_seconds": 600,
+  "provenance": {
+    "selected_on": "val",
+    "source": "eval/results/cross_session.json",
+    "chosen": "K=3, window=7d",
+    "seed": 42,
+    "scale": 50000,
+    "stray_rate": 0.1,
+    "val_fpr_budget": 0.002,
+    "slow_gaps_seconds": [
+      7200,
+      14400
+    ]
+  }
+}

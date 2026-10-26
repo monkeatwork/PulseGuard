@@ -10,7 +10,11 @@ The running system is the evaluated system (REMEDIATION_TASK.md A2/B2):
     operating_point.json, written only by tune_fusion_weights.py on the
     validation split. Missing file or missing model => startup error.
   * same rule -- an alert is raised at the first decision point whose fused
-    score crosses the threshold.
+    score crosses the threshold, OR where the cross-session guard fires
+    (cross_session_guard.py: K unresolved denials within the window, K and
+    window from model_registry/cross_session_guard.json, selected on the
+    validation users). The guard covers what session scoring cannot see:
+    prompts paced more than a session gap apart.
 
 Runs as a background thread inside the detection_engine FastAPI app.
 Kafka handling (explicit commits, dead-letter path) is in
@@ -37,6 +41,7 @@ from pulseguard_common.db.session import get_session_factory
 from pulseguard_common.kafka_worker import consumer_config, make_dead_letter_sink, run_loop
 from pulseguard_common.sessions import session_pairs
 from services.detection_engine.app.calibration import calibrate, load_calibrator
+from services.detection_engine.app.cross_session_store import CONFIG_FILENAME, RedisDenialStore, load_guard_config
 from services.detection_engine.app.explain import (
     contributions,
     dominant_stage,
@@ -58,6 +63,9 @@ KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"
 ENRICHED_TOPIC = "pulseguard.events.enriched"
 ALERTS_TOPIC = "pulseguard.alerts"
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "/srv/services/detection_engine/app/model_registry"))
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+REDIS_PORT = int(os.environ.get("REDIS_PORT", "6379"))
+GUARD_SOURCE = "cross_session_guard"
 
 
 class ModelArtifactMissing(RuntimeError):
@@ -159,20 +167,39 @@ def _persist_events(db, message: dict, episode: str) -> None:
         db.execute(pg_insert(Event).values(rows).on_conflict_do_nothing())
 
 
+def guard_explanation(count: int, store: RedisDenialStore) -> dict:
+    """Same shape as the model explanations, so the dashboard renders it
+    unchanged; the bar is the count relative to the firing threshold."""
+    k, days = store.config.min_denials, store.config.window_seconds / 86400
+    return {
+        "source": GUARD_SOURCE,
+        "reasons": [{"feature": "unresolved_denials", "shap_value": count / k, "feature_value": count,
+                     "detail": f"{count} denials with no approval within {store.config.resolve_seconds // 60} min, "
+                               f"in the last {days:g} days (fires at {k})"}],
+        "contributions": {},
+    }
+
+
 class EnrichedMessageHandler:
     """Idempotent per-message processing: re-delivering a message updates
-    the same score row and alert instead of duplicating them."""
+    the same score row and alert instead of duplicating them (the guard
+    store keys decisions by event id, so its count is idempotent too)."""
 
-    def __init__(self, scorer: LiveScorer, session_factory, producer):
+    def __init__(self, scorer: LiveScorer, session_factory, producer, guard: RedisDenialStore | None = None):
         self.scorer = scorer
         self.session_factory = session_factory
         self.producer = producer
+        self.guard = guard
+
+    def _guard_count(self, user_id: str, trigger: dict) -> int | None:
+        if self.guard is None or trigger.get("decision") not in ("approve", "deny") or not trigger.get("ts"):
+            return None
+        return self.guard.record(user_id, datetime.fromisoformat(trigger["ts"]), trigger["decision"], trigger.get("event_id"))
 
     def __call__(self, raw: bytes) -> None:
         started = time.perf_counter()
         message = json.loads(raw)
         scores = self.scorer.score_message(message)
-        scoring_ms = (time.perf_counter() - started) * 1000
 
         vector = message["feature_vector"]
         user_id = vector["user_id"]
@@ -180,6 +207,11 @@ class EnrichedMessageHandler:
         decision_index = int(message.get("decision_index", 0))
         trigger = (message.get("sequence") or [{}])[-1]
         now = datetime.now(timezone.utc)
+
+        guard_count = self._guard_count(user_id, trigger)
+        guard_fired = guard_count is not None and self.guard.fired(guard_count)
+        raised = scores["raised"] or guard_fired
+        scoring_ms = (time.perf_counter() - started) * 1000
 
         publish = None
         db = self.session_factory()
@@ -191,13 +223,16 @@ class EnrichedMessageHandler:
                 decision=trigger.get("decision"), decision_latency_ms=trigger.get("decision_latency_ms"),
                 stage_a_score=scores["stage_a_score"], stage_b_score=scores["stage_b_score"],
                 stage_c_score=scores["stage_c_score"], fused_score=scores["fused_score"],
-                threshold=self.scorer.threshold, raised=scores["raised"], scoring_ms=scoring_ms,
+                threshold=self.scorer.threshold, raised=raised, scoring_ms=scoring_ms,
+                guard_unresolved_denials=guard_count, guard_fired=guard_fired,
             )
             db.execute(pg_insert(Score).values(**score_row).on_conflict_do_nothing())
 
             alert = db.scalars(select(Alert).where(Alert.burst_id == episode)).first()
-            if alert is None and scores["raised"]:
-                explanation = self.scorer.explain(message, scores)
+            if alert is None and raised:
+                explanation = (
+                    self.scorer.explain(message, scores) if scores["raised"] else guard_explanation(guard_count, self.guard)
+                )
                 alert = Alert(
                     alert_id=uuid.uuid4(), user_id=user_id, ts=now, updated_ts=now,
                     stage_a_score=scores["stage_a_score"], stage_b_score=scores["stage_b_score"],
@@ -205,12 +240,16 @@ class EnrichedMessageHandler:
                     calibrated_probability=scores["stage_b_score"], shap_top3=explanation["reasons"],
                     explanation_source=explanation["source"], feature_vector=vector, burst_id=episode,
                     n_decisions=decision_index + 1, first_crossing_decision=decision_index, status="open",
+                    guard_unresolved_denials=guard_count, guard_fired=guard_fired,
                 )
                 db.add(alert)
                 publish = "raised"
             elif alert is not None:
                 alert.n_decisions = max(alert.n_decisions or 0, decision_index + 1)
                 alert.updated_ts = now
+                if guard_fired and not alert.guard_fired:
+                    alert.guard_fired = True
+                    alert.guard_unresolved_denials = guard_count
                 if scores["fused_score"] > alert.fused_score:
                     explanation = self.scorer.explain(message, scores)
                     alert.stage_a_score = scores["stage_a_score"]
@@ -228,6 +267,7 @@ class EnrichedMessageHandler:
             db.commit()
             alert_id = str(alert.alert_id) if alert is not None else None
             fused_for_alert = alert.fused_score if alert is not None else scores["fused_score"]
+            guard_for_alert = bool(alert.guard_fired) if alert is not None else False
         finally:
             db.close()
 
@@ -239,22 +279,32 @@ class EnrichedMessageHandler:
                     "alert_id": alert_id, "user_id": user_id, "fused_score": fused_for_alert,
                     "burst_id": episode, "episode_id": episode, "reason": publish,
                     "decision": trigger.get("decision"), "ts": now.isoformat(),
+                    "guard_fired": guard_for_alert, "guard_unresolved_denials": guard_count,
                 }).encode("utf-8"),
             )
             self.producer.flush(5.0)
         logger.info(
-            "Scored user=%s episode=%s decision=%d fused=%.3f raised=%s (%.1f ms)",
-            user_id, episode, decision_index, scores["fused_score"], scores["raised"], scoring_ms,
+            "Scored user=%s episode=%s decision=%d fused=%.3f guard=%s raised=%s (%.1f ms)",
+            user_id, episode, decision_index, scores["fused_score"], guard_count, raised, scoring_ms,
         )
 
 
-def run_live_scorer_loop(stop_event: threading.Event, scorer: LiveScorer) -> None:
+def make_guard_store(model_dir: Path = MODEL_DIR) -> RedisDenialStore:
+    """Raises GuardConfigMissing at startup, like a missing operating point."""
+    import redis as redis_lib
+
+    config = load_guard_config(model_dir / CONFIG_FILENAME)
+    logger.info("Cross-session guard at %s", config.as_dict())
+    return RedisDenialStore(redis_lib.Redis(host=REDIS_HOST, port=REDIS_PORT), config)
+
+
+def run_live_scorer_loop(stop_event: threading.Event, scorer: LiveScorer, guard: RedisDenialStore) -> None:
     from confluent_kafka import Consumer, Producer
 
     session_factory = get_session_factory()
     producer = Producer({"bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS})
     consumer = Consumer(consumer_config(KAFKA_BOOTSTRAP_SERVERS, "detection-engine-v2"))
-    handler = EnrichedMessageHandler(scorer, session_factory, producer)
+    handler = EnrichedMessageHandler(scorer, session_factory, producer, guard)
     sink = make_dead_letter_sink("detection_engine", producer, session_factory)
     logger.info("Live scorer consuming %s", ENRICHED_TOPIC)
     run_loop(consumer, [ENRICHED_TOPIC], handler, sink, stop_event)

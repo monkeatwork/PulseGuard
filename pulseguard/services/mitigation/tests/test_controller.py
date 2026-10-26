@@ -107,3 +107,45 @@ def test_anti_dos_invariant_holds_even_with_extremely_high_frequency():
         if action == "step_up_required":
             state.record_failure(now)
         now += timedelta(seconds=1)  # far faster than the 5-min cooldown
+
+
+# --- the live worker's consideration gate ----------------------------------
+
+class _FakeDb:
+    def add(self, row):
+        pass
+
+    def commit(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class _FakeWebhook:
+    def __init__(self):
+        self.step_ups = []
+
+    def trigger_step_up(self, user_id, episode, reason):
+        self.step_ups.append((user_id, reason))
+        return True
+
+    def trigger_alt_factor(self, user_id, episode, reason):
+        pass
+
+
+def _alert(fused: float, guard_fired: bool) -> bytes:
+    import json
+
+    return json.dumps({"alert_id": None, "user_id": "u", "fused_score": fused, "episode_id": "u:ep",
+                       "guard_fired": guard_fired, "guard_unresolved_denials": 3 if guard_fired else None}).encode()
+
+
+def test_guard_alert_passes_the_fused_score_gate_and_a_low_score_alone_does_not():
+    from services.mitigation.app.live_worker import AlertHandler, UserStates
+
+    webhook = _FakeWebhook()
+    handler = AlertHandler(lambda: _FakeDb(), webhook, UserStates())
+    assert handler(_alert(0.1, guard_fired=False)) is None
+    assert handler(_alert(0.1, guard_fired=True)) == "step_up_required"
+    assert webhook.step_ups == [("u", "fused_score=0.100 unresolved_denials=3")]

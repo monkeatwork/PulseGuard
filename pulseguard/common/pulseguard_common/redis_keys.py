@@ -43,3 +43,14 @@ def known_countries_key(user_id: str) -> str:
 
 def known_devices_key(user_id: str) -> str:
     return f"pg:novelty:{user_id}:devices"
+
+
+def guard_denials_key(user_id: str) -> str:
+    """Sorted set (member = event id, score = event epoch seconds) of the
+    user's recent MFA denials, across sessions -- the cross-session guard's
+    state (services/detection_engine/app/cross_session_store.py)."""
+    return f"pg:guard:{user_id}:denials"
+
+
+def guard_approvals_key(user_id: str) -> str:
+    return f"pg:guard:{user_id}:approvals"

@@ -31,8 +31,13 @@ export const STEP_FEATURES = {
   "sequence: inter-prompt gap": "Prompt pacing",
 };
 
+// Cross-session guard (detection_engine/app/cross_session_guard.py).
+export const GUARD_FEATURES = {
+  unresolved_denials: "Unresolved denials across sessions",
+};
+
 const ALL = Object.fromEntries([...FREQUENCY, ...RESPONSE].map((f) => [f.key, f]));
-export const featureLabel = (key) => ALL[key]?.label || STEP_FEATURES[key] || key;
+export const featureLabel = (key) => ALL[key]?.label || STEP_FEATURES[key] || GUARD_FEATURES[key] || key;
 
 export function formatFeature(f, vector) {
   const v = vector?.[f.key];
@@ -61,7 +66,7 @@ export const STAGES = [
   { key: "b", name: "Stage B", full: "Stage B · XGBoost over the feature vector", color: "var(--series-2)" },
   { key: "c", name: "Stage C", full: "Stage C · GRU over the event sequence", color: "var(--series-3)" },
 ];
-export const SOURCE_LABEL = { stage_a: "Stage A (statistical)", stage_b: "Stage B (XGBoost · TreeSHAP)", stage_c: "Stage C (GRU · occlusion)" };
+export const SOURCE_LABEL = { stage_a: "Stage A (statistical)", stage_b: "Stage B (XGBoost · TreeSHAP)", stage_c: "Stage C (GRU · occlusion)", cross_session_guard: "Cross-session guard (unresolved denials)" };
 
 export const PROFILES = {
   high_volume_burst: { label: "High-volume burst", attack: true, blurb: "Many prompts in quick succession until the victim gives in — the classic MFA bombing." },

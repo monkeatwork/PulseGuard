@@ -10,7 +10,10 @@ export default function Reasons({ reasons = [], source }) {
     <div>
       {source && (
         <div className="small muted" style={{ marginBottom: 6 }}>
-          Explained by <b style={{ color: "var(--ink)" }}>{SOURCE_LABEL[source] || source}</b> — the component that contributed most to this alert's score.
+          Explained by <b style={{ color: "var(--ink)" }}>{SOURCE_LABEL[source] || source}</b>
+          {source === "cross_session_guard"
+            ? " — the session looked benign on its own; denials left unanswered across earlier sessions raised it."
+            : " — the component that contributed most to this alert's score."}
         </div>
       )}
       {reasons.map((r) => {

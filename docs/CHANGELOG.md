@@ -101,3 +101,29 @@ One entry per working iteration: what changed, why, files touched, known issues,
 - The release bundle's author list is a placeholder, and no code license has been chosen.
 
 **Next step:** wire the guard into the live scorer (Redis-backed history), fill in the release authors and upload to Zenodo, and plan a user study for the latency hypothesis.
+
+## 2026-10-26 — Iteration 6: cross-session guard in the live service
+
+**What changed**
+- The cross-session guard now runs in the live detection engine. `services/detection_engine/app/cross_session_store.py` keeps each user's recent denials and approvals in Redis (sorted sets keyed by event id, trimmed by event time). The live handler ORs the guard with the fused score, as the evaluation does.
+- `model_registry/cross_session_guard.json` (`make guard-config`) holds K = 3, window 7 days, resolve 10 min, with provenance from `eval/results/cross_session.json` (selected on validation users). The service refuses to start without it.
+- `scores` and `alerts` record `guard_unresolved_denials` and `guard_fired`. A guard alert's explanation is the unresolved-denial count, and the dashboard labels it.
+- The mitigation worker lets guard alerts past the fused-score gate (0.3): a slow attack's sessions look benign one at a time. `/operating-point` reports the guard config.
+- Tests:
+  - Redis store matches the pure guard on a random stream; redelivery doesn't double-count; trimming; config must be selected on val.
+  - Handler raises a slow attack the model scores as benign (real Postgres + Redis).
+  - Mitigation gate.
+  - End to end: a slow attack (prompts 2 h apart) produced to Kafka is alerted by the guard and stepped up by the mock IdP.
+- The full suite, including the Docker tests, now runs: 315 passed.
+
+**Why:** iteration 5 left the guard offline-only because Docker wasn't available. With Docker installed, it can be wired and tested in the running stack.
+
+**Files touched:** `pulseguard/services/detection_engine/app/{cross_session_store,cross_session_guard,live_scorer,main}.py`, `pulseguard/services/detection_engine/app/model_registry/cross_session_guard.json`, `pulseguard/services/detection_engine/{pyproject.toml,tests/test_cross_session_store.py,tests/test_live_scorer.py}`, `pulseguard/services/mitigation/{app/live_worker.py,tests/test_controller.py}`, `pulseguard/services/dashboard/src/{lib/features.js,charts/Reasons.jsx}`, `pulseguard/common/pulseguard_common/{redis_keys.py,db/models.py}`, `pulseguard/infra/postgres/init.sql`, `pulseguard/docker-compose.yml`, `pulseguard/tests/integration/test_compose_health.py`, `pulseguard/{Makefile,README.md,DECISIONS.md}`, `docs/{HOW_IT_WORKS,CHANGELOG}.md`.
+
+**Known issues**
+- Once the guard fires for a user, each of their later sessions in the 7-day window is alerted until the denials age out. These are step-ups, not lockouts.
+- A decision that arrives more than a session gap late isn't sent by the feature engine, so the guard never counts it.
+- `test_live_scorer.py` segfaults when run on its own on macOS (torch/xgboost OpenMP clash). This is pre-existing and unrelated to this change; it passes inside the full suite.
+- The latency model is still synthetic; the release authors and code license are still open.
+
+**Next step:** fill in the release authors and choose a code license, upload the bundle to Zenodo, and plan a user study for the latency hypothesis.

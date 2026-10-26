@@ -35,6 +35,12 @@ class CrossSessionGuardConfig:
     window_seconds: int = 24 * 3600
     resolve_seconds: int = 10 * 60
 
+    @property
+    def horizon_seconds(self) -> int:
+        """How far behind the newest decision anything can still matter: a
+        denial at the window's edge needs `resolve` more for its approval."""
+        return self.window_seconds + self.resolve_seconds
+
     def as_dict(self) -> dict:
         return {
             "min_denials": self.min_denials,
@@ -73,9 +79,7 @@ def observe(history: DenialHistory, ts: datetime, decision: str, config: CrossSe
     """Records one MFA decision; True if the user has `min_denials`
     unresolved denials in the window ending at `ts`."""
     bisect.insort(history.denials if decision == "deny" else history.approvals, ts)
-    horizon = max(history.denials[-1:] + history.approvals[-1:]) - timedelta(
-        seconds=config.window_seconds + config.resolve_seconds
-    )
+    horizon = max(history.denials[-1:] + history.approvals[-1:]) - timedelta(seconds=config.horizon_seconds)
     for times in (history.denials, history.approvals):
         del times[: bisect.bisect_left(times, horizon)]
     return unresolved_denials(history, ts, config) >= config.min_denials
