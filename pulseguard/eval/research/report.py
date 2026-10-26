@@ -300,12 +300,15 @@ def claims_section(sweep: dict, hard: list[dict], cross: dict | None = None) -> 
         hs = big["summary"]
         lo, hi = hs[list(hs)[0]], hs[list(hs)[-1]]
         r = big["config"]["hard_negatives"]["deny_run_rate"]
+        n_seeds = len(big["config"]["seeds"])
         lines.append(
             f"4. **Latency becomes useful when denials stop being free evidence.** If {r:.0%} of benign high-activity "
             f"logins follow a run of denials, the two-denials rule's FPR rises to {m(hi, 'deny_run_rule', 'fpr'):.3f}, "
-            f"while PulseGuard's FPR is {m(lo, 'pulseguard', 'fpr'):.4f} without a latency signal and "
-            f"{m(hi, 'pulseguard', 'fpr'):.4f} with the full collapse (one seed). This is the setting in which the "
-            f"response-latency hypothesis can be tested."
+            f"while PulseGuard's FPR is {_ci(lo['pulseguard']['fpr'], 4)} without a latency signal and "
+            f"{_ci(hi['pulseguard']['fpr'], 4)} with the full collapse "
+            f"({n_seeds} seed{'s' if n_seeds > 1 else ''}{', 95% CI' if n_seeds > 1 else ''}). This is the one setting "
+            f"where the response-latency signal measurably lowers false positives; whether real fatigued users show "
+            f"that latency collapse still needs a user study."
         )
     if cross is None:
         lines.append(
@@ -316,16 +319,17 @@ def claims_section(sweep: dict, hard: list[dict], cross: dict | None = None) -> 
         adv = cross["adaptive"]["no_latency_signal"]
         slow = [k for k in adv if int(k.split(":")[0]) >= 7200]
         mean = lambda det: sum(adv[k][det]["recall"] for k in slow) / len(slow)  # noqa: E731
-        usual = [k for k in slow if k.split(":")[1] == "1"]
-        mean_usual = sum(adv[k]["pulseguard_or_guard"]["recall"] for k in usual) / len(usual)
+        def mean_where(lure: str) -> float:
+            keys = [k for k in slow if k.split(":")[2] == lure]
+            return sum(adv[k]["pulseguard_or_guard"]["recall"] for k in keys) / len(keys)
         sweep_hi = cross["stray_sweep"][max(cross["stray_sweep"], key=float)]
         both = mean("pulseguard_or_guard")
         headline = "Slow pacing is closed" if both >= 0.95 else "Slow pacing is partly closed"
         lines.append(
             f"5. **{headline}.** Against attackers pacing prompts 2-4 h apart, PulseGuard alone "
             f"catches {mean('pulseguard'):.2f} of attacks (victim with no latency change); PulseGuard OR the "
-            f"cross-session guard ({cross['chosen']}) catches {both:.2f} (averaged over usual-hours timing and lure on/off; "
-            f"{mean_usual:.2f} when prompts also keep to the victim's usual hours), at a benign FPR on never-attacked "
+            f"cross-session guard ({cross['chosen']}) catches {mean_where('0'):.2f} without a lure and "
+            f"{mean_where('1'):.2f} with one (usual-hours timing on and off), at a benign FPR on never-attacked "
             f"users of {_f(sweep_hi['pulseguard_or_guard']['fpr_never_attacked_users'], 4)} with stray denials at "
             f"p = {float(max(cross['stray_sweep'], key=float)):g}. The lure is what still gets through: it ends the "
             f"attack after the first denials, before K unresolved denials accumulate."

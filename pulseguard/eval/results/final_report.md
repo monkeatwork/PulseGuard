@@ -51,8 +51,8 @@ Anti-DoS invariant under mimicry pacing: **HOLDS**.
 1. **Against the industry rules, PulseGuard detects far more attacks at a comparable false-positive rate.** At s = 1: recall 0.999 (FPR 0.0012) vs Elastic 0.618 and Splunk 0.316, mean of 5 seeds.
 2. **Response behaviour cuts false positives.** Frequency features alone: FPR 0.066; with the response-behaviour family: 0.0012. The work is done by the decision sequence (consecutive denials): on this benchmark a one-line two-denials rule (recall 0.995, FPR 0.0000) and a logistic regression (recall 0.995) match it.
 3. **`latency_drift_slope` and the latency collapse are a hypothesis, not a measured contribution.** Removing every latency difference between attack and benign (s = 0, matched null) moves PulseGuard recall from 0.999 to 0.995. Whether real fatigued users collapse their latency, and by how much, needs a user study; the sweep shows the detector does not depend on it.
-4. **Latency becomes useful when denials stop being free evidence.** If 10% of benign high-activity logins follow a run of denials, the two-denials rule's FPR rises to 0.423, while PulseGuard's FPR is 0.0371 without a latency signal and 0.0098 with the full collapse (one seed). This is the setting in which the response-latency hypothesis can be tested.
-5. **Known evasion:** an attacker who spaces prompts further apart than the 60-minute session gap is missed by every session-scoped detector (see Adaptive attacker); a cross-session denial counter closes it.
+4. **Latency becomes useful when denials stop being free evidence.** If 10% of benign high-activity logins follow a run of denials, the two-denials rule's FPR rises to 0.424, while PulseGuard's FPR is 0.0387 [0.0308, 0.0465] without a latency signal and 0.0084 [0.0023, 0.0145] with the full collapse (5 seeds, 95% CI). This is the one setting where the response-latency signal measurably lowers false positives; whether real fatigued users show that latency collapse still needs a user study.
+5. **Slow pacing is partly closed.** Against attackers pacing prompts 2-4 h apart, PulseGuard alone catches 0.00 of attacks (victim with no latency change); PulseGuard OR the cross-session guard (K=3, window=7d) catches 1.00 without a lure and 0.75 with one (usual-hours timing on and off), at a benign FPR on never-attacked users of 0.0020 with stray denials at p = 0.3. The lure is what still gets through: it ends the attack after the first denials, before K unresolved denials accumulate.
 
 ## Fatigue-strength sweep
 
@@ -329,23 +329,115 @@ Trained once on the assumed model (linear collapse, s = 1, matched null), then t
 | DuoLungo benign, s=1 | 1.000 / 0.0013 | 1.000 / 0.0013 | 0.994 / 0.0000 | 0.993 / 0.0000 |
 | DuoLungo benign, s=0 | 0.994 / 0.0013 | 0.993 / 0.0013 | 0.993 / 0.0000 | 0.993 / 0.0000 |
 
+## Cross-session guard (slow-pacing fix)
+
+Per user and across sessions, count denials that no approval followed within 10 minutes, and alert once K fall inside a trailing window. Every benign denial in the generator is retried and approved within the hour, so benign users are given stray unresolved denials (own device, one per active day with probability p) and p is swept. K and the window were chosen on validation users: the most slow-attack recall (gaps of 2 h or more) among settings with validation FPR on never-attacked users at most 0.002 at p = 0.1. **Chosen: K=3, window=7d.** Seed 42, test split. Figure: `cross_session.png`.
+
+**Validation grid** (FPR on never-attacked users / slow-attack recall)
+
+| Setting | FPR, never-attacked users | FPR, all benign episodes | Slow-attack recall |
+|---|---|---|---|
+| K=2, window=1d | 0.0260 | 0.0405 | 0.513 |
+| K=2, window=3d | 0.0310 | 0.0450 | 0.934 |
+| K=2, window=7d | 0.0310 | 0.0450 | 0.934 |
+| K=3, window=1d | 0.0000 | 0.0155 | 0.442 |
+| K=3, window=3d | 0.0005 | 0.0159 | 0.852 |
+| K=3, window=7d | 0.0005 | 0.0159 | 0.872 |
+| K=4, window=1d | 0.0000 | 0.0143 | 0.406 |
+| K=4, window=3d | 0.0000 | 0.0143 | 0.450 |
+| K=4, window=7d | 0.0000 | 0.0143 | 0.814 |
+| K=5, window=1d | 0.0000 | 0.0139 | 0.371 |
+| K=5, window=3d | 0.0000 | 0.0139 | 0.410 |
+| K=5, window=7d | 0.0000 | 0.0139 | 0.750 |
+
+**Test corpus with stray denials** (recall / FPR over all benign episodes / FPR over users never attacked)
+
+| p | PulseGuard | Guard | PulseGuard OR guard |
+|---|---|---|---|
+| 0 | 1.000 / 0.0013 / 0.0013 | 0.525 / 0.0000 / 0.0000 | 1.000 / 0.0013 / 0.0013 |
+| 0.02 | 1.000 / 0.0012 / 0.0012 | 0.525 / 0.0081 / 0.0000 | 1.000 / 0.0092 / 0.0012 |
+| 0.1 | 1.000 / 0.0008 / 0.0009 | 0.527 / 0.0216 / 0.0000 | 1.000 / 0.0224 / 0.0009 |
+| 0.3 | 1.000 / 0.0005 / 0.0006 | 0.531 / 0.0352 / 0.0014 | 1.000 / 0.0357 / 0.0020 |
+
+FPR over all benign episodes counts an alert on an account in the days after a real attack on it; the never-attacked column is what an ordinary user would see.
+
+With benign deny runs (r = 0.1, retried and approved within minutes) the guard's FPR is 0.0000 (0.0000 on never-attacked users): runs that end in an approval are resolved, which is why the two-denials rule fails there and this guard does not.
+
+**Adaptive attacker, victim: default_fatigue; usual hours off; no lure** (recall)
+
+| Gap | PulseGuard | Guard | PulseGuard OR guard |
+|---|---|---|---|
+| 1 min | 1.000 | 0.210 | 1.000 |
+| 2 min | 1.000 | 0.708 | 1.000 |
+| 5 min | 1.000 | 0.998 | 1.000 |
+| 10 min | 1.000 | 1.000 | 1.000 |
+| 20 min | 1.000 | 1.000 | 1.000 |
+| 40 min | 1.000 | 0.998 | 1.000 |
+| 1 h | 0.985 | 1.000 | 1.000 |
+| 2 h | 0.000 | 0.998 | 0.998 |
+| 4 h | 0.000 | 1.000 | 1.000 |
+
+**Adaptive attacker, victim: default_fatigue; usual hours on; no lure** (recall)
+
+| Gap | PulseGuard | Guard | PulseGuard OR guard |
+|---|---|---|---|
+| 1 min | 1.000 | 0.323 | 1.000 |
+| 2 min | 1.000 | 0.735 | 1.000 |
+| 5 min | 1.000 | 0.998 | 1.000 |
+| 10 min | 1.000 | 0.998 | 1.000 |
+| 20 min | 0.995 | 1.000 | 1.000 |
+| 40 min | 0.932 | 1.000 | 1.000 |
+| 1 h | 0.343 | 1.000 | 1.000 |
+| 2 h | 0.000 | 1.000 | 1.000 |
+| 4 h | 0.000 | 1.000 | 1.000 |
+
+**Adaptive attacker, victim: no_latency_signal; usual hours off; no lure** (recall)
+
+| Gap | PulseGuard | Guard | PulseGuard OR guard |
+|---|---|---|---|
+| 1 min | 1.000 | 0.240 | 1.000 |
+| 2 min | 1.000 | 0.723 | 1.000 |
+| 5 min | 1.000 | 0.998 | 1.000 |
+| 10 min | 1.000 | 1.000 | 1.000 |
+| 20 min | 1.000 | 0.998 | 1.000 |
+| 40 min | 1.000 | 0.998 | 1.000 |
+| 1 h | 0.985 | 1.000 | 1.000 |
+| 2 h | 0.000 | 0.998 | 0.998 |
+| 4 h | 0.000 | 1.000 | 1.000 |
+
+**Adaptive attacker, victim: no_latency_signal; usual hours on; no lure** (recall)
+
+| Gap | PulseGuard | Guard | PulseGuard OR guard |
+|---|---|---|---|
+| 1 min | 1.000 | 0.345 | 1.000 |
+| 2 min | 1.000 | 0.752 | 1.000 |
+| 5 min | 1.000 | 0.998 | 1.000 |
+| 10 min | 1.000 | 0.998 | 1.000 |
+| 20 min | 0.995 | 1.000 | 1.000 |
+| 40 min | 0.932 | 1.000 | 1.000 |
+| 1 h | 0.340 | 1.000 | 1.000 |
+| 2 h | 0.000 | 1.000 | 1.000 |
+| 4 h | 0.000 | 1.000 | 1.000 |
+
+Anti-lockout invariant with the combined detector, all 72 settings: **HOLDS**.
+
 ## Benign users who deny several prompts in a row
 
-In the default corpus no benign episode ever has two consecutive denials, so a one-line rule separates the classes. Here a share r of benign high-activity logins is preceded by 2-4 denied prompts (benign denial latency, own device). r is an assumption, so it is swept. Each cell: recall / FPR, seed 42, matched null.
+In the default corpus no benign episode ever has two consecutive denials, so a one-line rule separates the classes. Here a share r of benign high-activity logins is preceded by 2-4 denied prompts (benign denial latency, own device). r is an assumption, so it is swept. Each cell: recall / FPR (mean across seeds where there are several), matched null.
 
-| r | s | 2 consecutive denials (one-line rule) | Elastic (2 deny + approve) | Logistic regression | PulseGuard, frequency features only | PulseGuard, full fusion |
-|---|---|---|---|---|---|---|
-| 0.01 | 0 | 0.993 / 0.0995 | 0.610 / 0.1015 | 0.993 / 0.0052 | 0.991 / 0.0761 | 0.994 / 0.0078 |
-| 0.01 | 0.5 | 0.993 / 0.0995 | 0.610 / 0.1015 | 0.993 / 0.0052 | 0.991 / 0.0755 | 0.996 / 0.0085 |
-| 0.01 | 1 | 0.993 / 0.0995 | 0.610 / 0.1015 | 0.993 / 0.0052 | 0.991 / 0.0742 | 0.999 / 0.0059 |
-| 0.03 | 0 | 0.993 / 0.2284 | 0.610 / 0.2297 | 0.993 / 0.0130 | 0.993 / 0.0800 | 0.993 / 0.0091 |
-| 0.03 | 0.5 | 0.993 / 0.2284 | 0.610 / 0.2297 | 0.993 / 0.0111 | 0.992 / 0.0761 | 0.994 / 0.0117 |
-| 0.03 | 1 | 0.993 / 0.2284 | 0.610 / 0.2297 | 0.993 / 0.0111 | 0.991 / 0.0761 | 0.997 / 0.0085 |
-| 0.1 | 0 | 0.993 / 0.4229 | 0.610 / 0.4229 | 0.993 / 0.0488 | 0.991 / 0.1047 | 0.992 / 0.0371 |
-| 0.1 | 0.5 | 0.993 / 0.4229 | 0.610 / 0.4229 | 0.993 / 0.0475 | 0.990 / 0.1041 | 0.983 / 0.0234 |
-| 0.1 | 1 | 0.993 / 0.4229 | 0.610 / 0.4229 | 0.993 / 0.0429 | 0.991 / 0.1061 | 0.996 / 0.0098 |
+| r | seeds | s | 2 consecutive denials (one-line rule) | Elastic (2 deny + approve) | Logistic regression | PulseGuard, frequency features only | PulseGuard, full fusion |
+|---|---|---|---|---|---|---|---|
+| 0.01 | 1 | 0 | 0.993 / 0.0995 | 0.610 / 0.1015 | 0.993 / 0.0052 | 0.991 / 0.0761 | 0.994 / 0.0078 |
+| 0.01 | 1 | 0.5 | 0.993 / 0.0995 | 0.610 / 0.1015 | 0.993 / 0.0052 | 0.991 / 0.0755 | 0.996 / 0.0085 |
+| 0.01 | 1 | 1 | 0.993 / 0.0995 | 0.610 / 0.1015 | 0.993 / 0.0052 | 0.991 / 0.0742 | 0.999 / 0.0059 |
+| 0.03 | 1 | 0 | 0.993 / 0.2284 | 0.610 / 0.2297 | 0.993 / 0.0130 | 0.993 / 0.0800 | 0.993 / 0.0091 |
+| 0.03 | 1 | 0.5 | 0.993 / 0.2284 | 0.610 / 0.2297 | 0.993 / 0.0111 | 0.992 / 0.0761 | 0.994 / 0.0117 |
+| 0.03 | 1 | 1 | 0.993 / 0.2284 | 0.610 / 0.2297 | 0.993 / 0.0111 | 0.991 / 0.0761 | 0.997 / 0.0085 |
+| 0.1 | 5 | 0 | 0.995 / 0.4237 | 0.618 / 0.4237 | 0.995 / 0.0529 | 0.985 / 0.0911 | 0.993 / 0.0387 |
+| 0.1 | 5 | 0.5 | 0.995 / 0.4237 | 0.618 / 0.4237 | 0.994 / 0.0512 | 0.985 / 0.0903 | 0.988 / 0.0313 |
+| 0.1 | 5 | 1 | 0.995 / 0.4237 | 0.618 / 0.4237 | 0.993 / 0.0458 | 0.983 / 0.0884 | 0.992 / 0.0084 |
 
 - r = 0.01: from s = 0 to s = 1, PulseGuard recall changes by +0.005 and FPR by -0.0020: the latency signal does not measurably matter.
 - r = 0.03: from s = 0 to s = 1, PulseGuard recall changes by +0.004 and FPR by -0.0007: the latency signal does not measurably matter.
-- r = 0.1: from s = 0 to s = 1, PulseGuard recall changes by +0.004 and FPR by -0.0273: the latency signal matters.
+- r = 0.1: from s = 0 to s = 1, PulseGuard recall changes by -0.001 and FPR by -0.0303: the latency signal matters.
 

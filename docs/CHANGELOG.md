@@ -77,3 +77,27 @@ One entry per working iteration: what changed, why, files touched, known issues,
 - The latency model is still synthetic; no user study.
 
 **Next step:** benchmark release bundle (addition G: datasheet, corpus hash, license, Zenodo metadata); cross-session denial counter.
+
+## 2026-10-26 — Iteration 5: cross-session guard, 5-seed hard negatives, release bundle, plain-language explainer
+
+**What changed**
+- `docs/HOW_IT_WORKS.md`: plain-language explanation of what PulseGuard is (a trained model), why it scores 99% (it learned that two denials in a row mark an attack), and where reaction speed helps.
+- `services/detection_engine/app/cross_session_guard.py`: a per-user counter of unresolved denials (no approval within 10 min) that spans sessions. K = 3 within 7 days, chosen on validation users. `eval/research/cross_session.py` evaluates it with stray benign denials injected at p in {0, 0.02, 0.1, 0.3} per active day.
+  - For attackers pacing prompts 2-4 h apart, PulseGuard alone catches 0. PulseGuard OR guard catches 1.00 without a lure and 0.75 with one.
+  - Users never attacked who get flagged: at most 0.002.
+  - Anti-lockout holds at all 72 settings.
+- `hard_negatives_r0.1.json` now covers 5 seeds. PulseGuard FPR is 0.039 [0.031, 0.047] at s = 0 and 0.008 [0.002, 0.015] at s = 1. That confirms the one setting where the latency signal lowers false positives.
+- `benchmark/release/` and `make release`: Zenodo-ready bundle with corpus, by-user split, datasheet, CC BY 4.0 data license with attribution, CITATION.cff, .zenodo.json, SHA256SUMS and content hash, plus `--verify`.
+- Report: cross-session section; claims 4 and 5 are now computed from the result files.
+
+**Why:** the next steps from iteration 4: confirm the latency effect across seeds, close the slow-pacing evasion, and addition G.
+
+**Files touched:** `docs/{HOW_IT_WORKS,CHANGELOG}.md`, `pulseguard/services/detection_engine/{app/cross_session_guard.py,tests/test_cross_session_guard.py}`, `pulseguard/eval/research/{cross_session,adaptive_attacker,report}.py`, `pulseguard/eval/tests/test_research_experiments.py`, `pulseguard/benchmark/release/*`, `pulseguard/benchmark/tests/test_release_bundle.py`, `pulseguard/eval/results/{cross_session.{json,png},hard_negatives_r0.1.json,final_report.md}`, `pulseguard/{Makefile,README.md,DECISIONS.md,.gitignore}`.
+
+**Known issues**
+- The guard isn't wired into the live scorer: it needs a per-user Redis store, and the Docker integration tests can't run here.
+- The guard's low FPR depends on benign denials being retried. The generator always retries them, so the stray rate p is an assumption. It is swept, not measured.
+- A lure that ends the attack after 1-2 denials still gets through the guard (K = 3).
+- The release bundle's author list is a placeholder, and no code license has been chosen.
+
+**Next step:** wire the guard into the live scorer (Redis-backed history), fill in the release authors and upload to Zenodo, and plan a user study for the latency hypothesis.

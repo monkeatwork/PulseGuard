@@ -99,11 +99,12 @@ normal busy users also press Deny a few times in a row:
 |---|---|
 | "2 denials in a row" rule | 42% (useless) |
 | Elastic's rule | 42% |
-| PulseGuard, no speed clue in the data | 3.7% |
-| PulseGuard, with the speed clue | **1.0%** |
+| PulseGuard, no speed clue in the data | 3.9% |
+| PulseGuard, with the speed clue | **0.8%** |
 
-That is the one place where reaction speed clearly adds something. It is from
-one random seed so far and is being re-run on 5 seeds.
+That is the one place where reaction speed clearly adds something. It holds
+over 5 random seeds: the 95% ranges are 3.1–4.7% and 0.2–1.5%, so they don't
+overlap.
 
 ## 6. Compared with what companies use today
 
@@ -119,9 +120,18 @@ more than 10 minutes.
 
 ## 7. Known weaknesses
 
-- **Very slow attackers win.** If pushes are sent more than 1 hour apart, every
-  push starts a new session, so PulseGuard never sees a run of denials. Fix:
-  count denials per user across sessions (being built now).
+- **Very slow attackers beat PulseGuard alone.** If pushes are sent more than
+  1 hour apart, every push starts a new session, so PulseGuard never sees a run
+  of denials. **Fix (built):** a second check counts, per user and across
+  sessions, denials that were never followed by an approval within 10 minutes.
+  It alerts at 3 of them within 7 days. Normal users who deny usually approve a
+  retry within minutes, so those denials don't count.
+  - PulseGuard + this check catches **100%** of attacks paced 2–4 hours apart,
+    and 75% when the attacker uses a lure (the lure can end the attack after
+    only 1–2 denials).
+  - Users never attacked who get flagged: at most **0.2%**, even when we add
+    a stray unanswered denial on 30% of their active days.
+  - Not wired into the live service yet (needs Redis + Docker).
 - **The data is synthetic.** Normal logins come from a real dataset (Wiefling
   RBA), but the attacks, the Deny/Approve choices and the reaction times are
   generated. Nobody has measured how real tired users behave; that needs a

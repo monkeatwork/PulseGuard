@@ -248,7 +248,11 @@ def plot(out: dict, path: Path) -> None:
     ax1.legend(fontsize=8)
     rates = list(out["stray_sweep"])
     for det, (name, color, marker) in style.items():
-        ax2.plot([float(r) for r in rates], [out["stray_sweep"][r][det]["fpr"] for r in rates], marker=marker, color=color, label=name)
+        ax2.plot([float(r) for r in rates], [out["stray_sweep"][r][det]["fpr"] for r in rates], marker=marker, color=color,
+                 label=f"{name}, all benign episodes")
+        if det != "pulseguard":
+            ax2.plot([float(r) for r in rates], [out["stray_sweep"][r][det]["fpr_never_attacked_users"] for r in rates],
+                     marker=marker, color=color, linestyle="--", label=f"{name}, users never attacked")
     ax2.set(title=f"Benign FPR vs stray-denial rate ({out['chosen']})", xlabel="Stray unresolved denials per active day (p)",
             ylabel="False-positive rate")
     ax2.grid(alpha=0.3)

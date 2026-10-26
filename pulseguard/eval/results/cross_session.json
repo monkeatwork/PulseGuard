@@ -1,0 +1,3869 @@
+{
+  "seed": 42,
+  "scale": 50000,
+  "guard": {
+    "resolve_seconds": 600,
+    "k_grid": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "window_grid_seconds": [
+      86400,
+      259200,
+      604800
+    ]
+  },
+  "selection": {
+    "stray_rate": 0.1,
+    "val_fpr_budget": 0.002,
+    "slow_gaps_seconds": [
+      7200,
+      14400
+    ],
+    "val": {
+      "K=2, window=1d": {
+        "fpr": 0.040474243663123466,
+        "fpr_never_attacked_users": 0.026003649635036496,
+        "slow_attack_recall": 0.513125
+      },
+      "K=2, window=3d": {
+        "fpr": 0.044971381847914965,
+        "fpr_never_attacked_users": 0.03102189781021898,
+        "slow_attack_recall": 0.934375
+      },
+      "K=2, window=7d": {
+        "fpr": 0.044971381847914965,
+        "fpr_never_attacked_users": 0.03102189781021898,
+        "slow_attack_recall": 0.934375
+      },
+      "K=3, window=1d": {
+        "fpr": 0.01553556827473426,
+        "fpr_never_attacked_users": 0.0,
+        "slow_attack_recall": 0.441875
+      },
+      "K=3, window=3d": {
+        "fpr": 0.015944399018806215,
+        "fpr_never_attacked_users": 0.0004562043795620438,
+        "slow_attack_recall": 0.8521875
+      },
+      "K=3, window=7d": {
+        "fpr": 0.015944399018806215,
+        "fpr_never_attacked_users": 0.0004562043795620438,
+        "slow_attack_recall": 0.8721875
+      },
+      "K=4, window=1d": {
+        "fpr": 0.014309076042518397,
+        "fpr_never_attacked_users": 0.0,
+        "slow_attack_recall": 0.405625
+      },
+      "K=4, window=3d": {
+        "fpr": 0.014309076042518397,
+        "fpr_never_attacked_users": 0.0,
+        "slow_attack_recall": 0.4503125
+      },
+      "K=4, window=7d": {
+        "fpr": 0.014309076042518397,
+        "fpr_never_attacked_users": 0.0,
+        "slow_attack_recall": 0.81375
+      },
+      "K=5, window=1d": {
+        "fpr": 0.013900245298446443,
+        "fpr_never_attacked_users": 0.0,
+        "slow_attack_recall": 0.370625
+      },
+      "K=5, window=3d": {
+        "fpr": 0.013900245298446443,
+        "fpr_never_attacked_users": 0.0,
+        "slow_attack_recall": 0.4096875
+      },
+      "K=5, window=7d": {
+        "fpr": 0.013900245298446443,
+        "fpr_never_attacked_users": 0.0,
+        "slow_attack_recall": 0.75
+      }
+    }
+  },
+  "chosen": "K=3, window=7d",
+  "chosen_config": {
+    "min_denials": 3,
+    "window_seconds": 604800,
+    "resolve_seconds": 600
+  },
+  "operating_point": {
+    "weights": {
+      "a": 0.1,
+      "b": 0.85,
+      "c": 0.05
+    },
+    "thresholds": {
+      "stage_b": 0.74,
+      "frequency_only": 0.87,
+      "stage_c": 0.76,
+      "pulseguard": 0.67,
+      "isolation_forest": 0.6,
+      "logistic_regression": 0.75,
+      "stage_a": 0.5
+    }
+  },
+  "split": "test (by user)",
+  "stray_sweep": {
+    "0.0": {
+      "pulseguard": {
+        "precision": 0.9991390443392165,
+        "recall": 0.9995693367786391,
+        "fpr": 0.0013012361743656475,
+        "tp": 2321,
+        "fp": 2,
+        "tn": 1535,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.00035691845236287016,
+          0.004732157244429259
+        ],
+        "fpr_never_attacked_users": 0.0013012361743656475,
+        "n_benign_never_attacked": 1537
+      },
+      "guard": {
+        "precision": 1.0,
+        "recall": 0.524547803617571,
+        "fpr": 0.0,
+        "tp": 1218,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1104,
+        "recall_ci": [
+          0.5042115204242297,
+          0.5448029984148157
+        ],
+        "fpr_ci": [
+          2.168404344971009e-19,
+          0.002493091549882259
+        ],
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "pulseguard_or_guard": {
+        "precision": 0.9991390443392165,
+        "recall": 0.9995693367786391,
+        "fpr": 0.0013012361743656475,
+        "tp": 2321,
+        "fp": 2,
+        "tn": 1535,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.00035691845236287016,
+          0.004732157244429259
+        ],
+        "fpr_never_attacked_users": 0.0013012361743656475,
+        "n_benign_never_attacked": 1537
+      },
+      "guard_grid": {
+        "K=2, window=1d": {
+          "precision": 1.0,
+          "recall": 0.5499569336778639,
+          "fpr": 0.0,
+          "tp": 1277,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1045,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=2, window=3d": {
+          "precision": 1.0,
+          "recall": 0.5499569336778639,
+          "fpr": 0.0,
+          "tp": 1277,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1045,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=2, window=7d": {
+          "precision": 1.0,
+          "recall": 0.5499569336778639,
+          "fpr": 0.0,
+          "tp": 1277,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1045,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=3, window=1d": {
+          "precision": 1.0,
+          "recall": 0.524547803617571,
+          "fpr": 0.0,
+          "tp": 1218,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1104,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=3, window=3d": {
+          "precision": 1.0,
+          "recall": 0.524547803617571,
+          "fpr": 0.0,
+          "tp": 1218,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1104,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=3, window=7d": {
+          "precision": 1.0,
+          "recall": 0.524547803617571,
+          "fpr": 0.0,
+          "tp": 1218,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1104,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=4, window=1d": {
+          "precision": 1.0,
+          "recall": 0.47243755383290265,
+          "fpr": 0.0,
+          "tp": 1097,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1225,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=4, window=3d": {
+          "precision": 1.0,
+          "recall": 0.47243755383290265,
+          "fpr": 0.0,
+          "tp": 1097,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1225,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=4, window=7d": {
+          "precision": 1.0,
+          "recall": 0.47243755383290265,
+          "fpr": 0.0,
+          "tp": 1097,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1225,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=5, window=1d": {
+          "precision": 1.0,
+          "recall": 0.42506459948320413,
+          "fpr": 0.0,
+          "tp": 987,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1335,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=5, window=3d": {
+          "precision": 1.0,
+          "recall": 0.42506459948320413,
+          "fpr": 0.0,
+          "tp": 987,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1335,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        },
+        "K=5, window=7d": {
+          "precision": 1.0,
+          "recall": 0.42506459948320413,
+          "fpr": 0.0,
+          "tp": 987,
+          "fp": 0,
+          "tn": 1537,
+          "fn": 1335,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1537
+        }
+      }
+    },
+    "0.02": {
+      "pulseguard": {
+        "precision": 0.9991390443392165,
+        "recall": 0.9995693367786391,
+        "fpr": 0.0011554015020219526,
+        "tp": 2321,
+        "fp": 2,
+        "tn": 1729,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.0003169099698202562,
+          0.004203075865671923
+        ],
+        "fpr_never_attacked_users": 0.0011940298507462687,
+        "n_benign_never_attacked": 1675
+      },
+      "guard": {
+        "precision": 0.9886455798864558,
+        "recall": 0.5249784668389319,
+        "fpr": 0.008087810514153668,
+        "tp": 1219,
+        "fp": 14,
+        "tn": 1717,
+        "fn": 1103,
+        "recall_ci": [
+          0.5046423387988406,
+          0.5452320838794864
+        ],
+        "fpr_ci": [
+          0.004823841353055542,
+          0.013530261645116538
+        ],
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1675
+      },
+      "pulseguard_or_guard": {
+        "precision": 0.9931536157466838,
+        "recall": 0.9995693367786391,
+        "fpr": 0.00924321201617562,
+        "tp": 2321,
+        "fp": 16,
+        "tn": 1715,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.005697515397716749,
+          0.014962273794235315
+        ],
+        "fpr_never_attacked_users": 0.0011940298507462687,
+        "n_benign_never_attacked": 1675
+      },
+      "guard_grid": {
+        "K=2, window=1d": {
+          "precision": 0.9792944785276073,
+          "recall": 0.5499569336778639,
+          "fpr": 0.01559792027729636,
+          "tp": 1277,
+          "fp": 27,
+          "tn": 1704,
+          "fn": 1045,
+          "fpr_never_attacked_users": 0.006567164179104477,
+          "n_benign_never_attacked": 1675
+        },
+        "K=2, window=3d": {
+          "precision": 0.9777947932618682,
+          "recall": 0.5499569336778639,
+          "fpr": 0.016753321779318313,
+          "tp": 1277,
+          "fp": 29,
+          "tn": 1702,
+          "fn": 1045,
+          "fpr_never_attacked_users": 0.007761194029850746,
+          "n_benign_never_attacked": 1675
+        },
+        "K=2, window=7d": {
+          "precision": 0.9777947932618682,
+          "recall": 0.5499569336778639,
+          "fpr": 0.016753321779318313,
+          "tp": 1277,
+          "fp": 29,
+          "tn": 1702,
+          "fn": 1045,
+          "fpr_never_attacked_users": 0.007761194029850746,
+          "n_benign_never_attacked": 1675
+        },
+        "K=3, window=1d": {
+          "precision": 0.9886455798864558,
+          "recall": 0.5249784668389319,
+          "fpr": 0.008087810514153668,
+          "tp": 1219,
+          "fp": 14,
+          "tn": 1717,
+          "fn": 1103,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=3, window=3d": {
+          "precision": 0.9886455798864558,
+          "recall": 0.5249784668389319,
+          "fpr": 0.008087810514153668,
+          "tp": 1219,
+          "fp": 14,
+          "tn": 1717,
+          "fn": 1103,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=3, window=7d": {
+          "precision": 0.9886455798864558,
+          "recall": 0.5249784668389319,
+          "fpr": 0.008087810514153668,
+          "tp": 1219,
+          "fp": 14,
+          "tn": 1717,
+          "fn": 1103,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=4, window=1d": {
+          "precision": 0.9891891891891892,
+          "recall": 0.4728682170542636,
+          "fpr": 0.006932409012131715,
+          "tp": 1098,
+          "fp": 12,
+          "tn": 1719,
+          "fn": 1224,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=4, window=3d": {
+          "precision": 0.9891891891891892,
+          "recall": 0.4728682170542636,
+          "fpr": 0.006932409012131715,
+          "tp": 1098,
+          "fp": 12,
+          "tn": 1719,
+          "fn": 1224,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=4, window=7d": {
+          "precision": 0.9891891891891892,
+          "recall": 0.4728682170542636,
+          "fpr": 0.006932409012131715,
+          "tp": 1098,
+          "fp": 12,
+          "tn": 1719,
+          "fn": 1224,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=5, window=1d": {
+          "precision": 0.9919678714859438,
+          "recall": 0.425495262704565,
+          "fpr": 0.00462160600808781,
+          "tp": 988,
+          "fp": 8,
+          "tn": 1723,
+          "fn": 1334,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=5, window=3d": {
+          "precision": 0.9919678714859438,
+          "recall": 0.425495262704565,
+          "fpr": 0.00462160600808781,
+          "tp": 988,
+          "fp": 8,
+          "tn": 1723,
+          "fn": 1334,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        },
+        "K=5, window=7d": {
+          "precision": 0.9919678714859438,
+          "recall": 0.425495262704565,
+          "fpr": 0.00462160600808781,
+          "tp": 988,
+          "fp": 8,
+          "tn": 1723,
+          "fn": 1334,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 1675
+        }
+      }
+    },
+    "0.1": {
+      "pulseguard": {
+        "precision": 0.9991390443392165,
+        "recall": 0.9995693367786391,
+        "fpr": 0.0007984031936127744,
+        "tp": 2321,
+        "fp": 2,
+        "tn": 2503,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.00021897826529626704,
+          0.002906551565664069
+        ],
+        "fpr_never_attacked_users": 0.0009041591320072332,
+        "n_benign_never_attacked": 2212
+      },
+      "guard": {
+        "precision": 0.9577464788732394,
+        "recall": 0.5271317829457365,
+        "fpr": 0.02155688622754491,
+        "tp": 1224,
+        "fp": 54,
+        "tn": 2451,
+        "fn": 1098,
+        "recall_ci": [
+          0.506796657312974,
+          0.5473772845617607
+        ],
+        "fpr_ci": [
+          0.01655951037317925,
+          0.02801941605817298
+        ],
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 2212
+      },
+      "pulseguard_or_guard": {
+        "precision": 0.9764408918805216,
+        "recall": 0.9995693367786391,
+        "fpr": 0.022355289421157686,
+        "tp": 2321,
+        "fp": 56,
+        "tn": 2449,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.01725574540300234,
+          0.028917542436057275
+        ],
+        "fpr_never_attacked_users": 0.0009041591320072332,
+        "n_benign_never_attacked": 2212
+      },
+      "guard_grid": {
+        "K=2, window=1d": {
+          "precision": 0.9209770114942529,
+          "recall": 0.5521102497846684,
+          "fpr": 0.043912175648702596,
+          "tp": 1282,
+          "fp": 110,
+          "tn": 2395,
+          "fn": 1040,
+          "fpr_never_attacked_users": 0.022603978300180832,
+          "n_benign_never_attacked": 2212
+        },
+        "K=2, window=3d": {
+          "precision": 0.9132290184921764,
+          "recall": 0.5529715762273901,
+          "fpr": 0.048702594810379245,
+          "tp": 1284,
+          "fp": 122,
+          "tn": 2383,
+          "fn": 1038,
+          "fpr_never_attacked_users": 0.02802893309222423,
+          "n_benign_never_attacked": 2212
+        },
+        "K=2, window=7d": {
+          "precision": 0.9132290184921764,
+          "recall": 0.5529715762273901,
+          "fpr": 0.048702594810379245,
+          "tp": 1284,
+          "fp": 122,
+          "tn": 2383,
+          "fn": 1038,
+          "fpr_never_attacked_users": 0.02802893309222423,
+          "n_benign_never_attacked": 2212
+        },
+        "K=3, window=1d": {
+          "precision": 0.9577133907595928,
+          "recall": 0.5267011197243755,
+          "fpr": 0.02155688622754491,
+          "tp": 1223,
+          "fp": 54,
+          "tn": 2451,
+          "fn": 1099,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=3, window=3d": {
+          "precision": 0.9577464788732394,
+          "recall": 0.5271317829457365,
+          "fpr": 0.02155688622754491,
+          "tp": 1224,
+          "fp": 54,
+          "tn": 2451,
+          "fn": 1098,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=3, window=7d": {
+          "precision": 0.9577464788732394,
+          "recall": 0.5271317829457365,
+          "fpr": 0.02155688622754491,
+          "tp": 1224,
+          "fp": 54,
+          "tn": 2451,
+          "fn": 1098,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=4, window=1d": {
+          "precision": 0.959094865100087,
+          "recall": 0.47459086993970717,
+          "fpr": 0.0187624750499002,
+          "tp": 1102,
+          "fp": 47,
+          "tn": 2458,
+          "fn": 1220,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=4, window=3d": {
+          "precision": 0.959094865100087,
+          "recall": 0.47459086993970717,
+          "fpr": 0.0187624750499002,
+          "tp": 1102,
+          "fp": 47,
+          "tn": 2458,
+          "fn": 1220,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=4, window=7d": {
+          "precision": 0.959094865100087,
+          "recall": 0.47459086993970717,
+          "fpr": 0.0187624750499002,
+          "tp": 1102,
+          "fp": 47,
+          "tn": 2458,
+          "fn": 1220,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=5, window=1d": {
+          "precision": 0.9622093023255814,
+          "recall": 0.42764857881136953,
+          "fpr": 0.015568862275449102,
+          "tp": 993,
+          "fp": 39,
+          "tn": 2466,
+          "fn": 1329,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=5, window=3d": {
+          "precision": 0.9622093023255814,
+          "recall": 0.42764857881136953,
+          "fpr": 0.015568862275449102,
+          "tp": 993,
+          "fp": 39,
+          "tn": 2466,
+          "fn": 1329,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        },
+        "K=5, window=7d": {
+          "precision": 0.9622093023255814,
+          "recall": 0.42764857881136953,
+          "fpr": 0.015568862275449102,
+          "tp": 993,
+          "fp": 39,
+          "tn": 2466,
+          "fn": 1329,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 2212
+        }
+      }
+    },
+    "0.3": {
+      "pulseguard": {
+        "precision": 0.9991390443392165,
+        "recall": 0.9995693367786391,
+        "fpr": 0.00046685340802987864,
+        "tp": 2321,
+        "fp": 2,
+        "tn": 4282,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.00012803738078420875,
+          0.0017007286535949636
+        ],
+        "fpr_never_attacked_users": 0.0005717552887364208,
+        "n_benign_never_attacked": 3498
+      },
+      "guard": {
+        "precision": 0.8908170643528561,
+        "recall": 0.5305770887166236,
+        "fpr": 0.035247432306255835,
+        "tp": 1232,
+        "fp": 151,
+        "tn": 4133,
+        "fn": 1090,
+        "recall_ci": [
+          0.510244353133489,
+          0.5508088194554974
+        ],
+        "fpr_ci": [
+          0.03012861078208244,
+          0.04119899350504323
+        ],
+        "fpr_never_attacked_users": 0.001429388221841052,
+        "n_benign_never_attacked": 3498
+      },
+      "pulseguard_or_guard": {
+        "precision": 0.9381568310428456,
+        "recall": 0.9995693367786391,
+        "fpr": 0.03571428571428571,
+        "tp": 2321,
+        "fp": 153,
+        "tn": 4131,
+        "fn": 1,
+        "recall_ci": [
+          0.9975644802456132,
+          0.9999239733209269
+        ],
+        "fpr_ci": [
+          0.03056008762650964,
+          0.04170038697273344
+        ],
+        "fpr_never_attacked_users": 0.002001143510577473,
+        "n_benign_never_attacked": 3498
+      },
+      "guard_grid": {
+        "K=2, window=1d": {
+          "precision": 0.8114035087719298,
+          "recall": 0.55770887166236,
+          "fpr": 0.07026143790849673,
+          "tp": 1295,
+          "fp": 301,
+          "tn": 3983,
+          "fn": 1027,
+          "fpr_never_attacked_users": 0.0411663807890223,
+          "n_benign_never_attacked": 3498
+        },
+        "K=2, window=3d": {
+          "precision": 0.7916160388821385,
+          "recall": 0.5611541774332472,
+          "fpr": 0.08006535947712418,
+          "tp": 1303,
+          "fp": 343,
+          "tn": 3941,
+          "fn": 1019,
+          "fpr_never_attacked_users": 0.05317324185248713,
+          "n_benign_never_attacked": 3498
+        },
+        "K=2, window=7d": {
+          "precision": 0.7916160388821385,
+          "recall": 0.5611541774332472,
+          "fpr": 0.08006535947712418,
+          "tp": 1303,
+          "fp": 343,
+          "tn": 3941,
+          "fn": 1019,
+          "fpr_never_attacked_users": 0.05317324185248713,
+          "n_benign_never_attacked": 3498
+        },
+        "K=3, window=1d": {
+          "precision": 0.8932461873638344,
+          "recall": 0.5297157622739018,
+          "fpr": 0.03431372549019608,
+          "tp": 1230,
+          "fp": 147,
+          "tn": 4137,
+          "fn": 1092,
+          "fpr_never_attacked_users": 0.0002858776443682104,
+          "n_benign_never_attacked": 3498
+        },
+        "K=3, window=3d": {
+          "precision": 0.8908170643528561,
+          "recall": 0.5305770887166236,
+          "fpr": 0.035247432306255835,
+          "tp": 1232,
+          "fp": 151,
+          "tn": 4133,
+          "fn": 1090,
+          "fpr_never_attacked_users": 0.001429388221841052,
+          "n_benign_never_attacked": 3498
+        },
+        "K=3, window=7d": {
+          "precision": 0.8908170643528561,
+          "recall": 0.5305770887166236,
+          "fpr": 0.035247432306255835,
+          "tp": 1232,
+          "fp": 151,
+          "tn": 4133,
+          "fn": 1090,
+          "fpr_never_attacked_users": 0.001429388221841052,
+          "n_benign_never_attacked": 3498
+        },
+        "K=4, window=1d": {
+          "precision": 0.8941925218774861,
+          "recall": 0.48406546080964685,
+          "fpr": 0.03104575163398693,
+          "tp": 1124,
+          "fp": 133,
+          "tn": 4151,
+          "fn": 1198,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 3498
+        },
+        "K=4, window=3d": {
+          "precision": 0.8941925218774861,
+          "recall": 0.48406546080964685,
+          "fpr": 0.03104575163398693,
+          "tp": 1124,
+          "fp": 133,
+          "tn": 4151,
+          "fn": 1198,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 3498
+        },
+        "K=4, window=7d": {
+          "precision": 0.8941925218774861,
+          "recall": 0.48406546080964685,
+          "fpr": 0.03104575163398693,
+          "tp": 1124,
+          "fp": 133,
+          "tn": 4151,
+          "fn": 1198,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 3498
+        },
+        "K=5, window=1d": {
+          "precision": 0.8959074733096085,
+          "recall": 0.43367786391042207,
+          "fpr": 0.0273109243697479,
+          "tp": 1007,
+          "fp": 117,
+          "tn": 4167,
+          "fn": 1315,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 3498
+        },
+        "K=5, window=3d": {
+          "precision": 0.896,
+          "recall": 0.43410852713178294,
+          "fpr": 0.0273109243697479,
+          "tp": 1008,
+          "fp": 117,
+          "tn": 4167,
+          "fn": 1314,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 3498
+        },
+        "K=5, window=7d": {
+          "precision": 0.896,
+          "recall": 0.43410852713178294,
+          "fpr": 0.0273109243697479,
+          "tp": 1008,
+          "fp": 117,
+          "tn": 4167,
+          "fn": 1314,
+          "fpr_never_attacked_users": 0.0,
+          "n_benign_never_attacked": 3498
+        }
+      }
+    }
+  },
+  "benign_deny_runs_r0.1": {
+    "pulseguard": {
+      "precision": 0.8483187134502924,
+      "recall": 0.9995693367786391,
+      "fpr": 0.27000650618087185,
+      "tp": 2321,
+      "fp": 415,
+      "tn": 1122,
+      "fn": 1,
+      "recall_ci": [
+        0.9975644802456132,
+        0.9999239733209269
+      ],
+      "fpr_ci": [
+        0.24840503715150228,
+        0.2927547648821781
+      ],
+      "fpr_never_attacked_users": 0.27000650618087185,
+      "n_benign_never_attacked": 1537
+    },
+    "guard": {
+      "precision": 1.0,
+      "recall": 0.524547803617571,
+      "fpr": 0.0,
+      "tp": 1218,
+      "fp": 0,
+      "tn": 1537,
+      "fn": 1104,
+      "recall_ci": [
+        0.5042115204242297,
+        0.5448029984148157
+      ],
+      "fpr_ci": [
+        2.168404344971009e-19,
+        0.002493091549882259
+      ],
+      "fpr_never_attacked_users": 0.0,
+      "n_benign_never_attacked": 1537
+    },
+    "pulseguard_or_guard": {
+      "precision": 0.8483187134502924,
+      "recall": 0.9995693367786391,
+      "fpr": 0.27000650618087185,
+      "tp": 2321,
+      "fp": 415,
+      "tn": 1122,
+      "fn": 1,
+      "recall_ci": [
+        0.9975644802456132,
+        0.9999239733209269
+      ],
+      "fpr_ci": [
+        0.24840503715150228,
+        0.2927547648821781
+      ],
+      "fpr_never_attacked_users": 0.27000650618087185,
+      "n_benign_never_attacked": 1537
+    },
+    "guard_grid": {
+      "K=2, window=1d": {
+        "precision": 1.0,
+        "recall": 0.5499569336778639,
+        "fpr": 0.0,
+        "tp": 1277,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1045,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=2, window=3d": {
+        "precision": 1.0,
+        "recall": 0.5499569336778639,
+        "fpr": 0.0,
+        "tp": 1277,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1045,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=2, window=7d": {
+        "precision": 1.0,
+        "recall": 0.5499569336778639,
+        "fpr": 0.0,
+        "tp": 1277,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1045,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=3, window=1d": {
+        "precision": 1.0,
+        "recall": 0.524547803617571,
+        "fpr": 0.0,
+        "tp": 1218,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1104,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=3, window=3d": {
+        "precision": 1.0,
+        "recall": 0.524547803617571,
+        "fpr": 0.0,
+        "tp": 1218,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1104,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=3, window=7d": {
+        "precision": 1.0,
+        "recall": 0.524547803617571,
+        "fpr": 0.0,
+        "tp": 1218,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1104,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=4, window=1d": {
+        "precision": 1.0,
+        "recall": 0.47243755383290265,
+        "fpr": 0.0,
+        "tp": 1097,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1225,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=4, window=3d": {
+        "precision": 1.0,
+        "recall": 0.47243755383290265,
+        "fpr": 0.0,
+        "tp": 1097,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1225,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=4, window=7d": {
+        "precision": 1.0,
+        "recall": 0.47243755383290265,
+        "fpr": 0.0,
+        "tp": 1097,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1225,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=5, window=1d": {
+        "precision": 1.0,
+        "recall": 0.42506459948320413,
+        "fpr": 0.0,
+        "tp": 987,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1335,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=5, window=3d": {
+        "precision": 1.0,
+        "recall": 0.42506459948320413,
+        "fpr": 0.0,
+        "tp": 987,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1335,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      },
+      "K=5, window=7d": {
+        "precision": 1.0,
+        "recall": 0.42506459948320413,
+        "fpr": 0.0,
+        "tp": 987,
+        "fp": 0,
+        "tn": 1537,
+        "fn": 1335,
+        "fpr_never_attacked_users": 0.0,
+        "n_benign_never_attacked": 1537
+      }
+    }
+  },
+  "adaptive": {
+    "default_fatigue": {
+      "60:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.21,
+          "recall_ci": [
+            0.1729377251738417,
+            0.25257940554005026
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 308,
+            "step_up_required": 92
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 297,
+            "alt_factor_required": 103
+          }
+        }
+      },
+      "60:0:1": {
+        "pulseguard": {
+          "recall": 0.9925,
+          "recall_ci": [
+            0.9781842792759678,
+            0.9974461108047501
+          ]
+        },
+        "guard": {
+          "recall": 0.015,
+          "recall_ci": [
+            0.006892291919440893,
+            0.03233463358482672
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.9925,
+          "recall_ci": [
+            0.9781842792759678,
+            0.9974461108047501
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 397,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 338,
+            "step_up_required": 59
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 383,
+            "alt_factor_required": 14
+          }
+        }
+      },
+      "60:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.3225,
+          "recall_ci": [
+            0.27856795807266865,
+            0.3698089064160066
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 316,
+            "step_up_required": 84
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 300,
+            "alt_factor_required": 100
+          }
+        }
+      },
+      "60:1:1": {
+        "pulseguard": {
+          "recall": 0.9925,
+          "recall_ci": [
+            0.9781842792759678,
+            0.9974461108047501
+          ]
+        },
+        "guard": {
+          "recall": 0.0825,
+          "recall_ci": [
+            0.05934587622971528,
+            0.1135968895394223
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.9925,
+          "recall_ci": [
+            0.9781842792759678,
+            0.9974461108047501
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 397,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 337,
+            "step_up_required": 60
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 384,
+            "alt_factor_required": 13
+          }
+        }
+      },
+      "120:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.7075,
+          "recall_ci": [
+            0.6611144240081159,
+            0.7499379738431511
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "alt_factor_required": 203,
+            "cooldown_active": 166,
+            "step_up_required": 31
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 266,
+            "step_up_required": 134
+          }
+        }
+      },
+      "120:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.2675,
+          "recall_ci": [
+            0.22648238411831478,
+            0.31294083274713314
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 240,
+            "step_up_required": 61,
+            "alt_factor_required": 49
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 238,
+            "alt_factor_required": 112
+          }
+        }
+      },
+      "120:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.735,
+          "recall_ci": [
+            0.6896629392432349,
+            0.7758662824196457
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "alt_factor_required": 152,
+            "cooldown_active": 222,
+            "step_up_required": 26
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 209,
+            "step_up_required": 191
+          }
+        }
+      },
+      "120:1:1": {
+        "pulseguard": {
+          "recall": 0.8725,
+          "recall_ci": [
+            0.836234529877535,
+            0.9016788108434143
+          ]
+        },
+        "guard": {
+          "recall": 0.325,
+          "recall_ci": [
+            0.28095326743154514,
+            0.3723760355854586
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8725,
+          "recall_ci": [
+            0.836234529877535,
+            0.9016788108434143
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 349,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 250,
+            "step_up_required": 61,
+            "alt_factor_required": 38
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 259,
+            "alt_factor_required": 90
+          }
+        }
+      },
+      "300:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 155,
+            "alt_factor_required": 193,
+            "step_up_required": 52
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 229,
+            "alt_factor_required": 171
+          }
+        }
+      },
+      "300:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.565,
+          "recall_ci": [
+            0.516026076233405,
+            0.6127373255031363
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 150,
+            "alt_factor_required": 128,
+            "step_up_required": 72
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 125,
+            "step_up_required": 225
+          }
+        }
+      },
+      "300:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 199,
+            "alt_factor_required": 121,
+            "step_up_required": 80
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 276,
+            "alt_factor_required": 124
+          }
+        }
+      },
+      "300:1:1": {
+        "pulseguard": {
+          "recall": 0.8625,
+          "recall_ci": [
+            0.8252880733424808,
+            0.8928155132651543
+          ]
+        },
+        "guard": {
+          "recall": 0.6075,
+          "recall_ci": [
+            0.5588413833413011,
+            0.6541134733768252
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8625,
+          "recall_ci": [
+            0.8252880733424808,
+            0.8928155132651543
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 345,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 184,
+            "alt_factor_required": 81,
+            "step_up_required": 80
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 95,
+            "step_up_required": 250
+          }
+        }
+      },
+      "600:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 329,
+            "alt_factor_required": 33,
+            "step_up_required": 38
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 187,
+            "step_up_required": 213
+          }
+        }
+      },
+      "600:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.6925,
+          "recall_ci": [
+            0.6456251644125997,
+            0.7357126022686962
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "step_up_required": 21,
+            "alt_factor_required": 35,
+            "cooldown_active": 294
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 182,
+            "alt_factor_required": 168
+          }
+        }
+      },
+      "600:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 358,
+            "step_up_required": 16,
+            "alt_factor_required": 26
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 276,
+            "alt_factor_required": 124
+          }
+        }
+      },
+      "600:1:1": {
+        "pulseguard": {
+          "recall": 0.8475,
+          "recall_ci": [
+            0.8089761434535727,
+            0.8794128119840912
+          ]
+        },
+        "guard": {
+          "recall": 0.705,
+          "recall_ci": [
+            0.658528950995276,
+            0.7475710083276624
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8475,
+          "recall_ci": [
+            0.8089761434535727,
+            0.8794128119840912
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 339,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 313,
+            "alt_factor_required": 12,
+            "step_up_required": 14
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 235,
+            "alt_factor_required": 104
+          }
+        }
+      },
+      "1200:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "1200:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.745,
+          "recall_ci": [
+            0.7000956766555838,
+            0.785243299120611
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 350
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 350
+          }
+        }
+      },
+      "1200:1:0": {
+        "pulseguard": {
+          "recall": 0.995,
+          "recall_ci": [
+            0.9819550815637568,
+            0.9986277470452896
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "1200:1:1": {
+        "pulseguard": {
+          "recall": 0.815,
+          "recall_ci": [
+            0.7740142283989209,
+            0.8499930261704722
+          ]
+        },
+        "guard": {
+          "recall": 0.76,
+          "recall_ci": [
+            0.715799603858965,
+            0.7992540030872007
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.845,
+          "recall_ci": [
+            0.8062691036268745,
+            0.8771674132824607
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 338,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 338
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 338
+          }
+        }
+      },
+      "2400:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "2400:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.7475,
+          "recall_ci": [
+            0.7027083556965948,
+            0.7875830586079285
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 350
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 350
+          }
+        }
+      },
+      "2400:1:0": {
+        "pulseguard": {
+          "recall": 0.9325,
+          "recall_ci": [
+            0.9035733345645931,
+            0.9531985308362403
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "2400:1:1": {
+        "pulseguard": {
+          "recall": 0.6725,
+          "recall_ci": [
+            0.6250583013725689,
+            0.7166599570820987
+          ]
+        },
+        "guard": {
+          "recall": 0.76,
+          "recall_ci": [
+            0.715799603858965,
+            0.7992540030872007
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.805,
+          "recall_ci": [
+            0.7633481418022936,
+            0.8408493586537855
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 322,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 322
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 322
+          }
+        }
+      },
+      "3600:0:0": {
+        "pulseguard": {
+          "recall": 0.985,
+          "recall_ci": [
+            0.9676653664151732,
+            0.9931077080805591
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "3600:0:1": {
+        "pulseguard": {
+          "recall": 0.755,
+          "recall_ci": [
+            0.710557459419624,
+            0.7945912704698848
+          ]
+        },
+        "guard": {
+          "recall": 0.745,
+          "recall_ci": [
+            0.7000956766555838,
+            0.785243299120611
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8025,
+          "recall_ci": [
+            0.7606877261203903,
+            0.8385573358073602
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 321,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 321
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 321
+          }
+        }
+      },
+      "3600:1:0": {
+        "pulseguard": {
+          "recall": 0.3425,
+          "recall_ci": [
+            0.29769101850421636,
+            0.3903053542110871
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "3600:1:1": {
+        "pulseguard": {
+          "recall": 0.205,
+          "recall_ci": [
+            0.16833283817780625,
+            0.24727941547942867
+          ]
+        },
+        "guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.77,
+          "recall_ci": [
+            0.7263071915784445,
+            0.8085561694810355
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 308,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 308
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 308
+          }
+        }
+      },
+      "7200:0:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 399,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 399
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 399
+          }
+        }
+      },
+      "7200:0:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7425,
+          "recall_ci": [
+            0.697484812382584,
+            0.7829017248652822
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7425,
+          "recall_ci": [
+            0.697484812382584,
+            0.7829017248652822
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 297,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 297
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 297
+          }
+        }
+      },
+      "7200:1:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "7200:1:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 305,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 305
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 305
+          }
+        }
+      },
+      "14400:0:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "14400:0:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7475,
+          "recall_ci": [
+            0.7027083556965948,
+            0.7875830586079285
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7475,
+          "recall_ci": [
+            0.7027083556965948,
+            0.7875830586079285
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 299,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 299
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 299
+          }
+        }
+      },
+      "14400:1:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "14400:1:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 305,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 305
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 305
+          }
+        }
+      }
+    },
+    "no_latency_signal": {
+      "60:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.24,
+          "recall_ci": [
+            0.20074599691279923,
+            0.284200396141035
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "step_up_required": 94,
+            "cooldown_active": 306
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 278,
+            "alt_factor_required": 122
+          }
+        }
+      },
+      "60:0:1": {
+        "pulseguard": {
+          "recall": 0.8825,
+          "recall_ci": [
+            0.8472450357843669,
+            0.9104780590498961
+          ]
+        },
+        "guard": {
+          "recall": 0.0275,
+          "recall_ci": [
+            0.015423636260295411,
+            0.048565481885614784
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8825,
+          "recall_ci": [
+            0.8472450357843669,
+            0.9104780590498961
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 353,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 295,
+            "step_up_required": 58
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 336,
+            "alt_factor_required": 17
+          }
+        }
+      },
+      "60:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.345,
+          "recall_ci": [
+            0.30008782799282613,
+            0.3928609832508057
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 319,
+            "step_up_required": 81
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 290,
+            "alt_factor_required": 110
+          }
+        }
+      },
+      "60:1:1": {
+        "pulseguard": {
+          "recall": 0.8825,
+          "recall_ci": [
+            0.8472450357843669,
+            0.9104780590498961
+          ]
+        },
+        "guard": {
+          "recall": 0.09,
+          "recall_ci": [
+            0.06571729376939447,
+            0.12208278758472865
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8825,
+          "recall_ci": [
+            0.8472450357843669,
+            0.9104780590498961
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 353,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 293,
+            "step_up_required": 60
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 337,
+            "alt_factor_required": 16
+          }
+        }
+      },
+      "120:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.7225,
+          "recall_ci": [
+            0.6766612653345575,
+            0.7641057636866807
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "alt_factor_required": 210,
+            "cooldown_active": 151,
+            "step_up_required": 39
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 262,
+            "step_up_required": 138
+          }
+        }
+      },
+      "120:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.28,
+          "recall_ci": [
+            0.23825142339704647,
+            0.32593398611004404
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 234,
+            "step_up_required": 66,
+            "alt_factor_required": 50
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 239,
+            "alt_factor_required": 111
+          }
+        }
+      },
+      "120:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.7525,
+          "recall_ci": [
+            0.7079392288053334,
+            0.7922570625558467
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "alt_factor_required": 153,
+            "cooldown_active": 207,
+            "step_up_required": 40
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 207,
+            "step_up_required": 193
+          }
+        }
+      },
+      "120:1:1": {
+        "pulseguard": {
+          "recall": 0.8725,
+          "recall_ci": [
+            0.836234529877535,
+            0.9016788108434143
+          ]
+        },
+        "guard": {
+          "recall": 0.3325,
+          "recall_ci": [
+            0.2881179581855746,
+            0.38006866041641474
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8725,
+          "recall_ci": [
+            0.836234529877535,
+            0.9016788108434143
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 349,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 246,
+            "step_up_required": 65,
+            "alt_factor_required": 38
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 261,
+            "alt_factor_required": 88
+          }
+        }
+      },
+      "300:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 156,
+            "alt_factor_required": 192,
+            "step_up_required": 52
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 231,
+            "alt_factor_required": 169
+          }
+        }
+      },
+      "300:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.575,
+          "recall_ci": [
+            0.5260675370904098,
+            0.6225056187594458
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 154,
+            "alt_factor_required": 129,
+            "step_up_required": 67
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 128,
+            "step_up_required": 222
+          }
+        }
+      },
+      "300:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 203,
+            "alt_factor_required": 124,
+            "step_up_required": 73
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 273,
+            "alt_factor_required": 127
+          }
+        }
+      },
+      "300:1:1": {
+        "pulseguard": {
+          "recall": 0.8625,
+          "recall_ci": [
+            0.8252880733424808,
+            0.8928155132651543
+          ]
+        },
+        "guard": {
+          "recall": 0.6225,
+          "recall_ci": [
+            0.5740411128887363,
+            0.6686283749993612
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8625,
+          "recall_ci": [
+            0.8252880733424808,
+            0.8928155132651543
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 345,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 190,
+            "alt_factor_required": 83,
+            "step_up_required": 72
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 97,
+            "step_up_required": 248
+          }
+        }
+      },
+      "600:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 328,
+            "alt_factor_required": 29,
+            "step_up_required": 43
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 191,
+            "step_up_required": 209
+          }
+        }
+      },
+      "600:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.6925,
+          "recall_ci": [
+            0.6456251644125997,
+            0.7357126022686962
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 294,
+            "alt_factor_required": 37,
+            "step_up_required": 19
+          },
+          "legit_user_one_cooldown_later": {
+            "alt_factor_required": 169,
+            "step_up_required": 181
+          }
+        }
+      },
+      "600:1:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 357,
+            "step_up_required": 22,
+            "alt_factor_required": 21
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 276,
+            "alt_factor_required": 124
+          }
+        }
+      },
+      "600:1:1": {
+        "pulseguard": {
+          "recall": 0.8475,
+          "recall_ci": [
+            0.8089761434535727,
+            0.8794128119840912
+          ]
+        },
+        "guard": {
+          "recall": 0.705,
+          "recall_ci": [
+            0.658528950995276,
+            0.7475710083276624
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8475,
+          "recall_ci": [
+            0.8089761434535727,
+            0.8794128119840912
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 339,
+          "actions_seen": [
+            "alt_factor_required",
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 316,
+            "alt_factor_required": 12,
+            "step_up_required": 11
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 233,
+            "alt_factor_required": 106
+          }
+        }
+      },
+      "1200:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "1200:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.7425,
+          "recall_ci": [
+            0.697484812382584,
+            0.7829017248652822
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 350
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 350
+          }
+        }
+      },
+      "1200:1:0": {
+        "pulseguard": {
+          "recall": 0.995,
+          "recall_ci": [
+            0.9819550815637568,
+            0.9986277470452896
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "1200:1:1": {
+        "pulseguard": {
+          "recall": 0.815,
+          "recall_ci": [
+            0.7740142283989209,
+            0.8499930261704722
+          ]
+        },
+        "guard": {
+          "recall": 0.76,
+          "recall_ci": [
+            0.715799603858965,
+            0.7992540030872007
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.845,
+          "recall_ci": [
+            0.8062691036268745,
+            0.8771674132824607
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 338,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 338
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 338
+          }
+        }
+      },
+      "2400:0:0": {
+        "pulseguard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "2400:0:1": {
+        "pulseguard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "guard": {
+          "recall": 0.7425,
+          "recall_ci": [
+            0.697484812382584,
+            0.7829017248652822
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.875,
+          "recall_ci": [
+            0.8389809024860414,
+            0.9038848767632363
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 350,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 350
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 350
+          }
+        }
+      },
+      "2400:1:0": {
+        "pulseguard": {
+          "recall": 0.9325,
+          "recall_ci": [
+            0.9035733345645931,
+            0.9531985308362403
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "2400:1:1": {
+        "pulseguard": {
+          "recall": 0.6725,
+          "recall_ci": [
+            0.6250583013725689,
+            0.7166599570820987
+          ]
+        },
+        "guard": {
+          "recall": 0.76,
+          "recall_ci": [
+            0.715799603858965,
+            0.7992540030872007
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.805,
+          "recall_ci": [
+            0.7633481418022936,
+            0.8408493586537855
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 322,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 322
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 322
+          }
+        }
+      },
+      "3600:0:0": {
+        "pulseguard": {
+          "recall": 0.985,
+          "recall_ci": [
+            0.9676653664151732,
+            0.9931077080805591
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "3600:0:1": {
+        "pulseguard": {
+          "recall": 0.755,
+          "recall_ci": [
+            0.710557459419624,
+            0.7945912704698848
+          ]
+        },
+        "guard": {
+          "recall": 0.745,
+          "recall_ci": [
+            0.7000956766555838,
+            0.785243299120611
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.8025,
+          "recall_ci": [
+            0.7606877261203903,
+            0.8385573358073602
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 321,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 321
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 321
+          }
+        }
+      },
+      "3600:1:0": {
+        "pulseguard": {
+          "recall": 0.34,
+          "recall_ci": [
+            0.2952956192770117,
+            0.38774831490996325
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "3600:1:1": {
+        "pulseguard": {
+          "recall": 0.205,
+          "recall_ci": [
+            0.16833283817780625,
+            0.24727941547942867
+          ]
+        },
+        "guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.77,
+          "recall_ci": [
+            0.7263071915784445,
+            0.8085561694810355
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 308,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 308
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 308
+          }
+        }
+      },
+      "7200:0:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.9975,
+          "recall_ci": [
+            0.9859767149241766,
+            0.9995585522131983
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 399,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 399
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 399
+          }
+        }
+      },
+      "7200:0:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7425,
+          "recall_ci": [
+            0.697484812382584,
+            0.7829017248652822
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7425,
+          "recall_ci": [
+            0.697484812382584,
+            0.7829017248652822
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 297,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 297
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 297
+          }
+        }
+      },
+      "7200:1:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "7200:1:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 305,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 305
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 305
+          }
+        }
+      },
+      "14400:0:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "14400:0:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7475,
+          "recall_ci": [
+            0.7027083556965948,
+            0.7875830586079285
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7475,
+          "recall_ci": [
+            0.7027083556965948,
+            0.7875830586079285
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 299,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 299
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 299
+          }
+        }
+      },
+      "14400:1:0": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 1.0,
+          "recall_ci": [
+            0.9904877056657034,
+            0.9999999999999999
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 400,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 400
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 400
+          }
+        }
+      },
+      "14400:1:1": {
+        "pulseguard": {
+          "recall": 0.0,
+          "recall_ci": [
+            8.673617379884035e-19,
+            0.009512294334296508
+          ]
+        },
+        "guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "pulseguard_or_guard": {
+          "recall": 0.7625,
+          "recall_ci": [
+            0.7184235572819022,
+            0.8015824881925919
+          ]
+        },
+        "_anti_lockout": {
+          "holds": true,
+          "n_alerted_episodes": 305,
+          "actions_seen": [
+            "cooldown_active",
+            "step_up_required"
+          ],
+          "legit_user_on_return": {
+            "cooldown_active": 305
+          },
+          "legit_user_one_cooldown_later": {
+            "step_up_required": 305
+          }
+        }
+      }
+    }
+  },
+  "anti_lockout_holds_everywhere": true
+}
