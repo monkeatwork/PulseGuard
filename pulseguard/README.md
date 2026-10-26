@@ -63,7 +63,7 @@ make pipeline   # data -> generate -> baselines -> train -> tune -> ablation -> 
 
 `make data` fetches the RBA dataset from Zenodo (about 1.1 GB, MD5-verified) and has **no synthetic fallback**: if the fetch fails it stops. Training writes `model_registry/` (`stage_b.json`, `stage_b_calibrator.pkl`, `stage_c.pt`/`.npz`, `operating_point.json`). The live scorer refuses to start without them. Rebuild the images afterwards (`config-everything`).
 
-## Research experiments (fatigue sweep, before capitulation, adaptive attacker)
+## Research experiments (fatigue sweep, before capitulation, adaptive attacker, cross-session guard)
 
 ```bash
 make research            # hours at full scale: SCALE=5000 make research to try it first
@@ -72,10 +72,21 @@ make report              # appends the research sections to final_report.md
 
 `eval/research/` trains every stage in memory with the production functions and never touches `model_registry/`. Splunk and Elastic always go through the frozen harness. The generator's fatigue model is a parameter (`cli.py --fatigue-strength/--fatigue-shape/--fatigue-null/--benign-latency/--fatigue-heterogeneity`); its defaults reproduce the original corpus byte for byte. `eval/results/REPRODUCTION.md` records the reproduction of the committed numbers. Design decisions: DECISIONS.md, 2026-10-26.
 
+`services/detection_engine/app/cross_session_guard.py` counts unresolved denials per user across sessions, to catch attackers who space prompts more than an hour apart. It is evaluated offline (`eval/research/cross_session.py`) and is not yet wired into the live scorer.
+
+## Benchmark release bundle
+
+```bash
+make release             # regenerates the corpus, then data/release/pulseguard-mfa-fatigue-v1.0{,.tar.gz}
+```
+
+The bundle holds the corpus, the by-user split, a datasheet, the CC BY 4.0 data license with base-dataset attribution, `CITATION.cff`, `.zenodo.json` and checksums (`--verify` rechecks them). Fill in the author list in `benchmark/release/build_release.py` before uploading.
+
 ## Known issues and limits
 
 - The benchmark's attacks are synthetic overlays on real benign RBA logins. The RBA data has no push prompts or decisions, so every approve/deny and every reaction time is generated. The default latency parameters are hand-picked, not measured (an optional benign model is fitted to the DuoLungo field data, `--benign-latency duolungo`), and the benign denial rate is an assumption (see DECISIONS.md).
 - No benign profile ever denies twice in a row, while almost every attack does, so a one-line "two consecutive denials" rule separates the classes on this benchmark. Every research result reports that rule next to PulseGuard.
+- Every benign denial is retried and approved within the hour, so counting unresolved denials is easier here than on real logs. The cross-session guard is therefore evaluated with injected stray denials at several assumed rates.
 - Low-and-slow attacks are generated *without* within-episode fatigue drift, so `latency_drift_slope` carries no signal for that profile by construction. See the ablation result in `final_report.md`.
 - The mitigation controller's per-user state is in memory and resets when the service restarts. `run` always starts fresh anyway.
 - Only the replay and simulator adapters exist; Entra ID, Okta and Duo are future work. The IdP is a mock.

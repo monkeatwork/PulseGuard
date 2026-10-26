@@ -240,17 +240,17 @@ def hard_negative_section(files: list[dict]) -> list[str]:
         "",
         "In the default corpus no benign episode ever has two consecutive denials, so a one-line rule separates the "
         "classes. Here a share r of benign high-activity logins is preceded by 2-4 denied prompts (benign denial "
-        "latency, own device). r is an assumption, so it is swept. Each cell: recall / FPR, seed "
-        f"{', '.join(files[0]['config']['seeds'])}, matched null.",
+        "latency, own device). r is an assumption, so it is swept. Each cell: recall / FPR (mean across seeds where "
+        "there are several), matched null.",
         "",
-        "| r | s | " + " | ".join(DETECTOR_NAMES[d] for d in dets) + " |",
-        "|---|---|" + "---|" * len(dets),
+        "| r | seeds | s | " + " | ".join(DETECTOR_NAMES[d] for d in dets) + " |",
+        "|---|---|---|" + "---|" * len(dets),
     ]
     for data in files:
         r = data["config"]["hard_negatives"]["deny_run_rate"]
         for s, cells in data["summary"].items():
             lines.append(
-                f"| {r:g} | {float(s):g} | "
+                f"| {r:g} | {len(data['config']['seeds'])} | {float(s):g} | "
                 + " | ".join(f"{_f(cells[d]['recall']['mean'])} / {_f(cells[d]['fpr']['mean'], 4)}" for d in dets)
                 + " |"
             )
@@ -272,7 +272,7 @@ def hard_negative_section(files: list[dict]) -> list[str]:
     return lines
 
 
-def claims_section(sweep: dict, hard: list[dict]) -> list[str]:
+def claims_section(sweep: dict, hard: list[dict], cross: dict | None = None) -> list[str]:
     """What the measurements support, stated against the original claim."""
     summ = sweep["summary"]
     one, zero = summ.get("1.0") or summ[list(summ)[-1]], summ.get("0.0") or summ[list(summ)[0]]
@@ -307,9 +307,103 @@ def claims_section(sweep: dict, hard: list[dict]) -> list[str]:
             f"{m(hi, 'pulseguard', 'fpr'):.4f} with the full collapse (one seed). This is the setting in which the "
             f"response-latency hypothesis can be tested."
         )
+    if cross is None:
+        lines.append(
+            "5. **Known evasion:** an attacker who spaces prompts further apart than the 60-minute session gap is missed "
+            "by every session-scoped detector (see Adaptive attacker)."
+        )
+    else:
+        adv = cross["adaptive"]["no_latency_signal"]
+        slow = [k for k in adv if int(k.split(":")[0]) >= 7200]
+        mean = lambda det: sum(adv[k][det]["recall"] for k in slow) / len(slow)  # noqa: E731
+        usual = [k for k in slow if k.split(":")[1] == "1"]
+        mean_usual = sum(adv[k]["pulseguard_or_guard"]["recall"] for k in usual) / len(usual)
+        sweep_hi = cross["stray_sweep"][max(cross["stray_sweep"], key=float)]
+        both = mean("pulseguard_or_guard")
+        headline = "Slow pacing is closed" if both >= 0.95 else "Slow pacing is partly closed"
+        lines.append(
+            f"5. **{headline}.** Against attackers pacing prompts 2-4 h apart, PulseGuard alone "
+            f"catches {mean('pulseguard'):.2f} of attacks (victim with no latency change); PulseGuard OR the "
+            f"cross-session guard ({cross['chosen']}) catches {both:.2f} (averaged over usual-hours timing and lure on/off; "
+            f"{mean_usual:.2f} when prompts also keep to the victim's usual hours), at a benign FPR on never-attacked "
+            f"users of {_f(sweep_hi['pulseguard_or_guard']['fpr_never_attacked_users'], 4)} with stray denials at "
+            f"p = {float(max(cross['stray_sweep'], key=float)):g}. The lure is what still gets through: it ends the "
+            f"attack after the first denials, before K unresolved denials accumulate."
+        )
+    lines.append("")
+    return lines
+
+
+def cross_session_section(cs: dict) -> list[str]:
+    from eval.research.adaptive_attacker import GAPS_SECONDS
+
+    def label(g):
+        return f"{g // 60} min" if g < 3600 else f"{g // 3600} h"
+
+    sel = cs["selection"]
+    lines = [
+        "## Cross-session guard (slow-pacing fix)",
+        "",
+        "Per user and across sessions, count denials that no approval followed within "
+        f"{cs['guard']['resolve_seconds'] // 60} minutes, and alert once K fall inside a trailing window. Every benign "
+        "denial in the generator is retried and approved within the hour, so benign users are given stray unresolved "
+        "denials (own device, one per active day with probability p) and p is swept. K and the window were chosen on "
+        "validation users: the most slow-attack recall (gaps of 2 h or more) among settings with validation FPR on "
+        f"never-attacked users at most {sel['val_fpr_budget']} at p = {sel['stray_rate']:g}. "
+        f"**Chosen: {cs['chosen']}.** Seed {cs['seed']}, test split. Figure: `cross_session.png`.",
+        "",
+        "**Validation grid** (FPR on never-attacked users / slow-attack recall)",
+        "",
+        "| Setting | FPR, never-attacked users | FPR, all benign episodes | Slow-attack recall |",
+        "|---|---|---|---|",
+    ]
+    for name, v in sel["val"].items():
+        lines.append(f"| {name} | {_f(v['fpr_never_attacked_users'], 4)} | {_f(v['fpr'], 4)} | {_f(v['slow_attack_recall'])} |")
     lines += [
-        "5. **Known evasion:** an attacker who spaces prompts further apart than the 60-minute session gap is missed by "
-        "every session-scoped detector (see Adaptive attacker); a cross-session denial counter closes it.",
+        "",
+        "**Test corpus with stray denials** (recall / FPR over all benign episodes / FPR over users never attacked)",
+        "",
+        "| p | PulseGuard | Guard | PulseGuard OR guard |",
+        "|---|---|---|---|",
+    ]
+    for rate, v in cs["stray_sweep"].items():
+        lines.append(
+            f"| {float(rate):g} | "
+            + " | ".join(
+                f"{_f(v[d]['recall'])} / {_f(v[d]['fpr'], 4)} / {_f(v[d]['fpr_never_attacked_users'], 4)}"
+                for d in ("pulseguard", "guard", "pulseguard_or_guard")
+            )
+            + " |"
+        )
+    dr = cs["benign_deny_runs_r0.1"]["guard"]
+    lines += [
+        "",
+        "FPR over all benign episodes counts an alert on an account in the days after a real attack on it; the "
+        "never-attacked column is what an ordinary user would see.",
+        "",
+        f"With benign deny runs (r = 0.1, retried and approved within minutes) the guard's FPR is {_f(dr['fpr'], 4)} "
+        f"({_f(dr['fpr_never_attacked_users'], 4)} on never-attacked users): runs that end in an approval are resolved, "
+        "which is why the two-denials rule fails there and this guard does not.",
+        "",
+    ]
+    for victim, res in cs["adaptive"].items():
+        for usual in (0, 1):
+            lines += [
+                f"**Adaptive attacker, victim: {victim}; usual hours {'on' if usual else 'off'}; no lure** (recall)",
+                "",
+                "| Gap | PulseGuard | Guard | PulseGuard OR guard |",
+                "|---|---|---|---|",
+            ]
+            for g in GAPS_SECONDS:
+                r = res[f"{g}:{usual}:0"]
+                lines.append(
+                    f"| {label(g)} | {_f(r['pulseguard']['recall'])} | {_f(r['guard']['recall'])} | "
+                    f"{_f(r['pulseguard_or_guard']['recall'])} |"
+                )
+            lines.append("")
+    lines += [
+        f"Anti-lockout invariant with the combined detector, all 72 settings: "
+        f"**{'HOLDS' if cs['anti_lockout_holds_everywhere'] else 'VIOLATED'}**.",
         "",
     ]
     return lines
@@ -323,6 +417,7 @@ def build_research_sections(results_dir: Path) -> str:
         ("before_capitulation.json", before_capitulation_section),
         ("adaptive_attacker.json", adaptive_section),
         ("robustness.json", robustness_section),
+        ("cross_session.json", cross_session_section),
     ):
         data = _load(results_dir, name)
         if data is None:
@@ -340,5 +435,5 @@ def build_research_sections(results_dir: Path) -> str:
         parts += hard_negative_section(hard)
     sweep = _load(results_dir, "fatigue_sweep.json")
     if sweep is not None:
-        parts[3:3] = claims_section(sweep, hard)
+        parts[3:3] = claims_section(sweep, hard, _load(results_dir, "cross_session.json"))
     return "\n".join(parts)

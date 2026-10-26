@@ -9,7 +9,7 @@ SCALE ?= 50000
 EVENTS := data/generated/events.parquet
 MODELS := services/detection_engine/app/model_registry
 
-.PHONY: data generate baselines train evaluate report demo pipeline test research
+.PHONY: data generate baselines train evaluate report demo pipeline test research release
 
 # Fetches the Wiefling RBA dataset from Zenodo (record 10.5281/zenodo.6782156).
 # Idempotent; no synthetic fallback -- a failed fetch halts (DECISIONS.md).
@@ -51,6 +51,15 @@ research: data
 	$(PY) -m eval.research.before_capitulation --scale $(SCALE) --seed $(SEED) --strengths 1.0 --out eval/results/before_capitulation.json
 	$(PY) -m eval.research.adaptive_attacker --scale $(SCALE) --seed $(SEED) --out eval/results/adaptive_attacker.json --plot eval/results/adaptive_attacker.png
 	$(PY) -m eval.research.robustness --scale $(SCALE) --seed $(SEED) --out eval/results/robustness.json
+	for r in 0.01 0.03; do $(PY) -m eval.research.fatigue_sweep --scale $(SCALE) --seeds $(SEED) --strengths 0 0.5 1 --benign-deny-run-rate $$r --no-grid --out eval/results/hard_negatives_r$$r.json; done
+	$(PY) -m eval.research.fatigue_sweep --scale $(SCALE) --seeds $(SEEDS) --strengths 0 0.5 1 --benign-deny-run-rate 0.1 --no-grid --out eval/results/hard_negatives_r0.1.json
+	$(PY) -m eval.research.cross_session --scale $(SCALE) --seed $(SEED) --out eval/results/cross_session.json --plot eval/results/cross_session.png
+
+# Zenodo-ready benchmark bundle (benchmark/release/): regenerates the corpus so
+# the recorded code revision is the one that produced it. Output in data/release/.
+release: generate
+	$(PY) -m benchmark.release.build_release --corpus data/generated --out data/release
+	$(PY) -m benchmark.release.build_release --verify data/release/pulseguard-mfa-fatigue-v1.0
 
 pipeline: generate baselines train evaluate report demo
 

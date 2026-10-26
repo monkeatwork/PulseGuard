@@ -11,6 +11,7 @@ import pytest
 from benchmark.baselines import elastic_rule, splunk_rule
 from benchmark.generator.latency_models import DEFAULT_FATIGUE
 from eval.research.adaptive_attacker import _next_usual_time, generate_adaptive_attack
+from eval.research.cross_session import add_stray_denials
 from eval.research.before_capitulation import _detector_stats, episode_timeline, first_rule_firing
 from eval.research.stats import across_seeds, wilson
 
@@ -124,3 +125,32 @@ def test_deny_run_rule_needs_two_consecutive_denials():
     assert deny_run_rule(_episode(["deny", "deny", "approve"]))
     assert not deny_run_rule(_episode(["deny", "approve", "deny", "approve"]))
     assert not deny_run_rule(_episode(["approve"] * 5))
+
+
+def _login_days_df():
+    import pandas as pd
+
+    base = datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+    rows = [
+        {"user_id": u, "ts": base + timedelta(days=d), "event_type": "login_attempt", "decision": None,
+         "label_attack": False, "burst_id": None, "src_ip": "10.0.0.1", "device_id": f"dev-{u}",
+         "user_agent": "UA", "geo_country": "US"}
+        for u in ("a", "b", "c") for d in range(40)
+    ]
+    df = pd.DataFrame(rows)
+    df["ts"] = pd.to_datetime(df["ts"], utc=True)
+    return df
+
+
+def test_stray_denials_are_paired_across_rates():
+    df = _login_days_df()
+    assert add_stray_denials(df, 42, 0.0) is df
+
+    def strays(rate):
+        out = add_stray_denials(df, 42, rate)
+        dec = out[out["event_type"] == "mfa_decision"]
+        assert (dec["decision"] == "deny").all() and not dec["label_attack"].any()
+        return set(zip(dec["user_id"], dec["ts"]))
+
+    low, high = strays(0.1), strays(0.5)
+    assert low and low < high

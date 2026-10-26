@@ -17,6 +17,9 @@ data/raw/*
 # Generated benchmark corpora — reproducible from a seed via cli.py, never committed
 data/generated*/
 
+# Release bundles (benchmark/release/build_release.py) — uploaded to Zenodo, never committed
+data/release/
+
 # eval/results/*.json IS tracked: these are the actual reported precision/
 # recall/FPR numbers (baselines, ablation, adversarial) that the project's
 # claims are measured against — small files, and the whole point is that

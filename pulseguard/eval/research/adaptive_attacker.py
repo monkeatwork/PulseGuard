@@ -143,11 +143,11 @@ def generate_adaptive_attack(
     return events
 
 
-def victims_for_test_users(events_df: pd.DataFrame, seed: int, n_users: int) -> list[dict]:
+def victims_for_test_users(events_df: pd.DataFrame, seed: int, n_users: int, split: str = "test") -> list[dict]:
     logins = events_df[events_df["event_type"] == "login_attempt"]
     out = []
     for user_id, g in logins.groupby("user_id", sort=True):
-        if assign_split(seed, user_id) != "test":
+        if assign_split(seed, user_id) != split:
             continue
         g = g.sort_values("ts")
         last = g.iloc[-1]
