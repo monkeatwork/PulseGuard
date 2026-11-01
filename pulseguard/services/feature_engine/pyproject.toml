@@ -6,6 +6,8 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
     "faust-streaming>=0.10",
+    # faust-streaming 0.15.4 imports packaging without declaring it
+    "packaging>=23.0",
     "river>=0.21",
     "redis>=5.0",
     "pulseguard-common",

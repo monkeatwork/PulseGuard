@@ -127,3 +127,19 @@ One entry per working iteration: what changed, why, files touched, known issues,
 - The latency model is still synthetic; the release authors and code license are still open.
 
 **Next step:** fill in the release authors and choose a code license, upload the bundle to Zenodo, and plan a user study for the latency hypothesis.
+
+## 2026-11-01 — Iteration 7: fresh local setup, feature engine build fix
+
+**What changed**
+- Re-cloned the repository, created the Python 3.12 dev venv (`pulseguard/.venv`, `requirements-dev.txt`) and ran `config-everything.sh`.
+- `feature_engine` crash-looped on a fresh build with `ModuleNotFoundError: 'kafka' is not a valid name`. The real cause: faust-streaming 0.15.4 imports `packaging` in its aiokafka transport without declaring it. Added `packaging>=23.0` to the feature engine's dependencies.
+
+**Why:** a clean image build pulls the newest faust-streaming, so the stack no longer started from a fresh clone.
+
+**Files touched:** `pulseguard/services/feature_engine/pyproject.toml`, `docs/CHANGELOG.md`.
+
+**Known issues**
+- Docker integration tests (`tests/integration`) were not re-run in this iteration; `make test` passes (310).
+- faust-streaming and aiokafka are unpinned, so a future upstream release can break the build again.
+
+**Next step:** consider pinning the streaming dependencies; continue with the iteration 6 next steps (release authors, code license, Zenodo upload, user study plan).
