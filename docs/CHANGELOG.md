@@ -143,3 +143,19 @@ One entry per working iteration: what changed, why, files touched, known issues,
 - faust-streaming and aiokafka are unpinned, so a future upstream release can break the build again.
 
 **Next step:** consider pinning the streaming dependencies; continue with the iteration 6 next steps (release authors, code license, Zenodo upload, user study plan).
+
+## 2026-11-01 — Iteration 8: Final Review presentation
+
+**What changed**
+- Added `PulseGuard_Final_Review.pptx`: a 40-slide deck in the Review 1 style (Cambria/Calibri, same palette) covering introduction, problem statement, a 43-paper literature review, research gap and novelty, objectives, architecture, methodology, tools, experimental setup, results, objectives achieved, live dashboard screenshots, 32 references and conclusion. Every slide except the reference slides has speaker notes; charts are native PowerPoint charts.
+- Screenshots were captured from the running stack after replaying three held-out test attacks.
+
+**Why:** the final review needs a presentation of the built system and its results.
+
+**Files touched:** `PulseGuard_Final_Review.pptx`, `docs/CHANGELOG.md`.
+
+**Known issues**
+- References use a short "et al." form without DOIs (except the RBA dataset); check titles before submission.
+- The Review 1 papers by Wee et al. and Sasikumar & Nagarajan are not cited, because their full titles were not confirmed.
+
+**Next step:** rehearse with the speaker notes; plan the user study.
